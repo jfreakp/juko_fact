@@ -1,0 +1,240 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+// ─── Enums ────────────────────────────────────────────────────────────────────
+
+enum Role {
+  ADMIN
+  EMISOR
+}
+
+enum Ambiente {
+  PRUEBAS
+  PRODUCCION
+}
+
+enum TipoIdentificacion {
+  CEDULA
+  RUC
+  PASAPORTE
+  CONSUMIDOR_FINAL
+}
+
+enum TipoIVA {
+  IVA_0
+  IVA_5
+  IVA_12
+  IVA_15
+  NO_APLICA
+}
+
+enum TipoProducto {
+  BIEN
+  SERVICIO
+}
+
+enum EstadoComprobante {
+  PENDIENTE
+  ENVIADO
+  AUTORIZADO
+  RECHAZADO
+  ANULADO
+}
+
+enum TipoEmision {
+  NORMAL
+  INDISPONIBILIDAD
+}
+
+// ─── Models ───────────────────────────────────────────────────────────────────
+
+model User {
+  id        String   @id @default(cuid())
+  email     String   @unique
+  name      String
+  password  String
+  role      Role     @default(EMISOR)
+  active    Boolean  @default(true)
+  companyId String?
+  company   Company? @relation(fields: [companyId], references: [id])
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([email])
+  @@index([companyId])
+  @@map("users")
+}
+
+model Company {
+  id               String      @id @default(cuid())
+  ruc              String      @unique
+  razonSocial      String
+  nombreComercial  String?
+  dirMatriz        String
+  estab            String      @db.Char(3)
+  ptoEmi           String      @db.Char(3)
+  contribuyenteEsp String?
+  obligadoContab   Boolean     @default(false)
+  ambiente         Ambiente    @default(PRUEBAS)
+  tipoEmision      TipoEmision @default(NORMAL)
+  logoUrl          String?
+  active           Boolean     @default(true)
+  createdAt        DateTime    @default(now())
+  updatedAt        DateTime    @updatedAt
+
+  users        User[]
+  certificates Certificate[]
+  clients      Client[]
+  products     Product[]
+  invoices     Invoice[]
+
+  @@index([ruc])
+  @@map("companies")
+}
+
+model Certificate {
+  id          String   @id @default(cuid())
+  companyId   String
+  company     Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  fileName    String
+  fileData    Bytes
+  password    String
+  thumbprint  String?
+  validFrom   DateTime?
+  validTo     DateTime?
+  active      Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([companyId])
+  @@map("certificates")
+}
+
+model Client {
+  id               String             @id @default(cuid())
+  companyId        String
+  company          Company            @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  tipoIdentif      TipoIdentificacion @default(CEDULA)
+  identificacion   String
+  razonSocial      String
+  direccion        String?
+  email            String?
+  telefono         String?
+  active           Boolean            @default(true)
+  createdAt        DateTime           @default(now())
+  updatedAt        DateTime           @updatedAt
+  invoices         Invoice[]
+
+  @@unique([companyId, identificacion])
+  @@index([companyId])
+  @@index([identificacion])
+  @@map("clients")
+}
+
+model Product {
+  id              String       @id @default(cuid())
+  companyId       String
+  company         Company      @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  codigoPrincipal String
+  codigoAuxiliar  String?
+  descripcion     String
+  precio          Decimal      @db.Decimal(12, 2)
+  tipoIva         TipoIVA      @default(IVA_12)
+  tipo            TipoProducto @default(BIEN)
+  active          Boolean      @default(true)
+  createdAt       DateTime     @default(now())
+  updatedAt       DateTime     @updatedAt
+  invoiceDetails  InvoiceDetail[]
+
+  @@unique([companyId, codigoPrincipal])
+  @@index([companyId])
+  @@map("products")
+}
+
+model Invoice {
+  id                  String            @id @default(cuid())
+  companyId           String
+  company             Company           @relation(fields: [companyId], references: [id], onDelete: Restrict)
+  clientId            String
+  client              Client            @relation(fields: [clientId], references: [id], onDelete: Restrict)
+  secuencial          String            @db.Char(9)
+  claveAcceso         String?           @unique
+  fechaEmision        DateTime          @default(now())
+
+  // Totals
+  subtotal0           Decimal           @default(0) @db.Decimal(12, 2)
+  subtotal12          Decimal           @default(0) @db.Decimal(12, 2)
+  subtotal5           Decimal           @default(0) @db.Decimal(12, 2)
+  subtotal15          Decimal           @default(0) @db.Decimal(12, 2)
+  subtotalNoIva       Decimal           @default(0) @db.Decimal(12, 2)
+  totalDescuento      Decimal           @default(0) @db.Decimal(12, 2)
+  totalIva            Decimal           @default(0) @db.Decimal(12, 2)
+  propina             Decimal           @default(0) @db.Decimal(12, 2)
+  importeTotal        Decimal           @default(0) @db.Decimal(12, 2)
+
+  // SRI data
+  estado              EstadoComprobante @default(PENDIENTE)
+  xmlGenerado         String?           @db.Text
+  xmlFirmado          String?           @db.Text
+  xmlAutorizado       String?           @db.Text
+  numeroAutorizacion  String?
+  fechaAutorizacion   DateTime?
+  ambiente            Ambiente
+  observaciones       String?           @db.Text
+
+  createdAt           DateTime          @default(now())
+  updatedAt           DateTime          @updatedAt
+
+  details             InvoiceDetail[]
+  sriResponses        SRIResponse[]
+
+  @@unique([companyId, secuencial])
+  @@index([companyId])
+  @@index([clientId])
+  @@index([estado])
+  @@index([claveAcceso])
+  @@map("invoices")
+}
+
+model InvoiceDetail {
+  id                      String   @id @default(cuid())
+  invoiceId               String
+  invoice                 Invoice  @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+  productId               String?
+  product                 Product? @relation(fields: [productId], references: [id], onDelete: SetNull)
+
+  codigoPrincipal         String
+  codigoAuxiliar          String?
+  descripcion             String
+  cantidad                Decimal  @db.Decimal(12, 6)
+  precioUnitario          Decimal  @db.Decimal(12, 6)
+  descuento               Decimal  @default(0) @db.Decimal(12, 2)
+  precioTotalSinImpuesto  Decimal  @db.Decimal(12, 2)
+  tipoIva                 TipoIVA  @default(IVA_12)
+  valorIva                Decimal  @db.Decimal(12, 2)
+  orden                   Int      @default(0)
+  createdAt               DateTime @default(now())
+
+  @@index([invoiceId])
+  @@map("invoice_details")
+}
+
+model SRIResponse {
+  id            String   @id @default(cuid())
+  invoiceId     String
+  invoice       Invoice  @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+  tipo          String   // RECEPCION | AUTORIZACION
+  estado        String   // RECIBIDA | DEVUELTA | AUTORIZADA | NO_AUTORIZADA
+  mensaje       String?  @db.Text
+  informacion   String?  @db.Text
+  rawResponse   String?  @db.Text
+  createdAt     DateTime @default(now())
+
+  @@index([invoiceId])
+  @@map("sri_responses")
+}

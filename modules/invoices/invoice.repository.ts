@@ -77,12 +77,23 @@ export const invoiceRepository = {
   },
 
   async getNextSecuencial(companyId: string): Promise<string> {
-    const last = await prisma.invoice.findFirst({
-      where: { companyId },
-      orderBy: { secuencial: "desc" },
-      select: { secuencial: true },
-    });
-    const next = last ? parseInt(last.secuencial, 10) + 1 : 1;
+    const [last, company] = await Promise.all([
+      prisma.invoice.findFirst({
+        where: { companyId },
+        orderBy: { secuencial: "desc" },
+        select: { secuencial: true },
+      }),
+      prisma.company.findUnique({
+        where: { id: companyId },
+        select: { secuencialInicio: true },
+      }),
+    ]);
+
+    const inicio = company?.secuencialInicio ?? 1;
+    const lastNum = last ? parseInt(last.secuencial, 10) : 0;
+    // secuencialInicio actúa como piso mínimo:
+    // si ya hay facturas, continúa desde el último pero nunca por debajo de secuencialInicio.
+    const next = Math.max(lastNum + 1, inicio);
     return next.toString().padStart(9, "0");
   },
 

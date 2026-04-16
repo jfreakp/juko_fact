@@ -138,7 +138,7 @@ export default function ProductsPage() {
         />
       </div>
 
-      <div className="rounded-xl overflow-hidden" style={{ background: "var(--surface-white)" }}>
+      <div className="rounded-xl overflow-hidden p-4" style={{ background: "var(--surface-white)" }}>
         {loading ? (
           <div className="p-8 space-y-3">
             {[1, 2, 3, 4].map((i) => <div key={i} className="skeleton h-12 rounded-lg" />)}

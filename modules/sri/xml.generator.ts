@@ -33,15 +33,15 @@ export function buildInvoiceXML(data: InvoiceForXML): string {
   infoTrib.ele("ptoEmi").txt(company.ptoEmi);
   infoTrib.ele("secuencial").txt(invoice.secuencial);
   infoTrib.ele("dirMatriz").txt(company.dirMatriz);
+  // contribuyenteEspecial va en infoTributaria (v2.1.0), no en infoFactura
+  if (company.contribuyenteEsp) {
+    infoTrib.ele("contribuyenteEspecial").txt(company.contribuyenteEsp);
+  }
 
   // ── infoFactura ───────────────────────────────────────────────────────────
   const infoFact = root.ele("infoFactura");
   infoFact.ele("fechaEmision").txt(fechaEmision);
   infoFact.ele("dirEstablecimiento").txt(company.dirMatriz);
-
-  if (company.contribuyenteEsp) {
-    infoFact.ele("contribuyenteEspecial").txt(company.contribuyenteEsp);
-  }
 
   infoFact
     .ele("obligadoContabilidad")
@@ -67,37 +67,26 @@ export function buildInvoiceXML(data: InvoiceForXML): string {
   infoFact.ele("totalDescuento").txt(fmt(Number(invoice.totalDescuento)));
 
   // totalConImpuestos
+  // Los valores de IVA se suman desde los detalles (ya calculados y redondeados
+  // por línea) para evitar diferencias de redondeo al recalcular desde subtotales.
+  const ivaByTipo: Record<string, number> = {};
+  for (const d of details) {
+    ivaByTipo[d.tipoIva] = (ivaByTipo[d.tipoIva] ?? 0) + Number(d.valorIva);
+  }
+
   const totalConImpuestos = infoFact.ele("totalConImpuestos");
 
   if (Number(invoice.subtotal0) > 0) {
     addTotalImpuesto(totalConImpuestos, "2", "0", invoice.subtotal0, 0);
   }
   if (Number(invoice.subtotal12) > 0) {
-    addTotalImpuesto(
-      totalConImpuestos,
-      "2",
-      "2",
-      invoice.subtotal12,
-      (Number(invoice.subtotal12) * 12) / 100
-    );
+    addTotalImpuesto(totalConImpuestos, "2", "2", invoice.subtotal12, ivaByTipo["IVA_12"] ?? 0);
   }
   if (Number(invoice.subtotal5) > 0) {
-    addTotalImpuesto(
-      totalConImpuestos,
-      "2",
-      "5",
-      invoice.subtotal5,
-      (Number(invoice.subtotal5) * 5) / 100
-    );
+    addTotalImpuesto(totalConImpuestos, "2", "5", invoice.subtotal5, ivaByTipo["IVA_5"] ?? 0);
   }
   if (Number(invoice.subtotal15) > 0) {
-    addTotalImpuesto(
-      totalConImpuestos,
-      "2",
-      "4",
-      invoice.subtotal15,
-      (Number(invoice.subtotal15) * 15) / 100
-    );
+    addTotalImpuesto(totalConImpuestos, "2", "4", invoice.subtotal15, ivaByTipo["IVA_15"] ?? 0);
   }
   // Items sin IVA (No Objeto de Impuesto — codigoPorcentaje 6)
   if (Number(invoice.subtotalNoIva) > 0) {

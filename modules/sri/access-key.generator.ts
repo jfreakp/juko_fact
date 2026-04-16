@@ -1,17 +1,16 @@
 /**
  * Generates a 49-digit SRI access key (clave de acceso).
  *
- * Structure:
- *  [01-08]  fechaEmision    DD/MM/YYYY
- *  [09-10]  tipoComprobante "01" for factura
+ * Structure (SRI Ecuador spec):
+ *  [01-08]  fechaEmision    ddmmaaaa  (8 digits)
+ *  [09-10]  tipoComprobante Tabla 3   (2 digits) — "01" = Factura
  *  [11-23]  ruc             13 digits
- *  [24]     ambiente        1=PRUEBAS, 2=PRODUCCION
- *  [25-27]  estab           3 digits
- *  [28-30]  ptoEmi          3 digits
+ *  [24]     ambiente        Tabla 4   (1 digit)  — 1=PRUEBAS, 2=PRODUCCION
+ *  [25-30]  serie           estab(3) + ptoEmi(3) (6 digits)
  *  [31-39]  secuencial      9 digits
  *  [40-47]  codigoNumerico  8 digits — sequential counter stored per company
- *  [48]     tipoEmision     1=NORMAL
- *  [49]     digitoVerificador module-11
+ *  [48]     tipoEmision     Tabla 2   (1 digit)  — 1=NORMAL, 2=INDISPONIBILIDAD
+ *  [49]     digitoVerificador módulo 11 (1 digit)
  */
 export function generateAccessKey(params: {
   fechaEmision: Date;
@@ -37,26 +36,36 @@ export function generateAccessKey(params: {
     codigoNumerico,
   } = params;
 
+  if (ruc.length !== 13) {
+    throw new Error(`RUC debe tener 13 dígitos (recibido: ${ruc.length})`);
+  }
+  if (codigoNumerico.length !== 8) {
+    throw new Error(`codigoNumerico debe tener 8 dígitos (recibido: ${codigoNumerico.length})`);
+  }
+  if (tipoEmision !== "1" && tipoEmision !== "2") {
+    throw new Error(`tipoEmision debe ser "1" (NORMAL) o "2" (INDISPONIBILIDAD), recibido: "${tipoEmision}"`);
+  }
+
   const day = fechaEmision.getDate().toString().padStart(2, "0");
   const month = (fechaEmision.getMonth() + 1).toString().padStart(2, "0");
   const year = fechaEmision.getFullYear().toString();
 
-  const fecha = `${day}${month}${year}`;
+  const fecha = `${day}${month}${year}`;              // ddmmaaaa  (8)
   const ambienteCode = ambiente === "PRODUCCION" ? "2" : "1";
-  const establ = estab.padStart(3, "0");
-  const pto = ptoEmi.padStart(3, "0");
-  const seq = secuencial.padStart(9, "0");
+  const establ = estab.padStart(3, "0");              // 3 dígitos
+  const pto = ptoEmi.padStart(3, "0");                // 3 dígitos → serie = 6
+  const seq = secuencial.padStart(9, "0");            // 9 dígitos
 
   const base =
-    fecha +
-    tipoComprobante +
-    ruc +
-    ambienteCode +
-    establ +
-    pto +
-    seq +
-    codigoNumerico +
-    tipoEmision;
+    fecha +            //  8
+    tipoComprobante +  //  2
+    ruc +              // 13
+    ambienteCode +     //  1
+    establ +           //  3 ┐ serie
+    pto +              //  3 ┘ = 6
+    seq +              //  9
+    codigoNumerico +   //  8
+    tipoEmision;       //  1  → total base = 48
 
   if (base.length !== 48) {
     throw new Error(

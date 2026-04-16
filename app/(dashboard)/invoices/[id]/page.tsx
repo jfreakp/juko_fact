@@ -39,7 +39,7 @@ interface InvoiceData {
   company: { ruc: string; razonSocial: string; dirMatriz: string; estab: string; ptoEmi: string };
   client: { razonSocial: string; identificacion: string; email: string | null };
   details: InvoiceDetail[];
-  sriResponses: { id: string; tipo: string; estado: string; mensaje: string | null; createdAt: string }[];
+  sriResponses: { id: string; tipo: string; estado: string; mensaje: string | null; rawResponse: string | null; createdAt: string }[];
 }
 
 export default function InvoiceDetailPage({
@@ -242,29 +242,7 @@ export default function InvoiceDetailPage({
               </div>
               <div>
                 {invoice.sriResponses.map((r, idx) => (
-                  <div
-                    key={r.id}
-                    className="px-6 py-3 flex items-center gap-4"
-                    style={{
-                      background: idx % 2 === 0 ? "var(--surface-white)" : "var(--surface)",
-                    }}
-                  >
-                    <span
-                      className="text-[9px] font-bold tracking-widest uppercase w-24"
-                      style={{ color: "var(--text-muted)" }}
-                    >
-                      {r.tipo}
-                    </span>
-                    <Badge estado={r.estado === "RECIBIDA" || r.estado === "AUTORIZADA" ? "AUTORIZADO" : r.estado}>
-                      {r.estado}
-                    </Badge>
-                    {r.mensaje && (
-                      <span className="text-[11px] flex-1" style={{ color: "var(--text-secondary)" }}>{r.mensaje}</span>
-                    )}
-                    <span className="text-[10px] ml-auto" style={{ color: "var(--text-muted)" }}>
-                      {new Date(r.createdAt).toLocaleString("es-EC")}
-                    </span>
-                  </div>
+                  <SRIResponseRow key={r.id} r={r} idx={idx} />
                 ))}
               </div>
             </div>
@@ -340,6 +318,86 @@ export default function InvoiceDetailPage({
           )}
         </div>
       </div>
+    </div>
+  );
+}
+
+// ─── SRI Response Row ─────────────────────────────────────────────────────────
+
+function SRIResponseRow({
+  r,
+  idx,
+}: {
+  r: { id: string; tipo: string; estado: string; mensaje: string | null; rawResponse: string | null; createdAt: string };
+  idx: number;
+}) {
+  const [open, setOpen] = useState(false);
+  const isOk = r.estado === "RECIBIDA" || r.estado === "AUTORIZADA";
+
+  return (
+    <div
+      style={{ background: idx % 2 === 0 ? "var(--surface-white)" : "var(--surface)" }}
+    >
+      {/* Row header */}
+      <div className="px-6 py-3 flex items-center gap-4">
+        <span
+          className="text-[9px] font-bold tracking-widest uppercase w-24 flex-shrink-0"
+          style={{ color: "var(--text-muted)" }}
+        >
+          {r.tipo}
+        </span>
+        <Badge estado={isOk ? "AUTORIZADO" : r.estado}>{r.estado}</Badge>
+        {r.mensaje && (
+          <span className="text-[11px] flex-1 min-w-0 truncate" style={{ color: "var(--text-secondary)" }}>
+            {r.mensaje}
+          </span>
+        )}
+        <span className="text-[10px] flex-shrink-0" style={{ color: "var(--text-muted)" }}>
+          {new Date(r.createdAt).toLocaleString("es-EC")}
+        </span>
+        {r.rawResponse && (
+          <button
+            onClick={() => setOpen((v) => !v)}
+            className="flex-shrink-0 text-[9px] font-bold tracking-widest uppercase px-2 py-1 rounded"
+            style={{
+              background: open ? "var(--surface-highest)" : "var(--surface-low)",
+              color: "var(--text-muted)",
+            }}
+          >
+            {open ? "Ocultar" : "Ver XML"}
+          </button>
+        )}
+      </div>
+
+      {/* Raw response expandable */}
+      {open && r.rawResponse && (
+        <div
+          className="mx-6 mb-3 rounded-lg overflow-hidden"
+          style={{ border: "1px solid var(--surface-highest)" }}
+        >
+          <div
+            className="flex items-center justify-between px-3 py-2"
+            style={{ background: "var(--surface-low)", borderBottom: "1px solid var(--surface-highest)" }}
+          >
+            <span className="text-[9px] font-bold tracking-widest uppercase" style={{ color: "var(--text-muted)" }}>
+              Respuesta RAW del SRI
+            </span>
+            <button
+              onClick={() => navigator.clipboard?.writeText(r.rawResponse!)}
+              className="text-[9px] font-bold tracking-widest uppercase px-2 py-0.5 rounded"
+              style={{ background: "var(--surface-highest)", color: "var(--text-muted)" }}
+            >
+              Copiar
+            </button>
+          </div>
+          <pre
+            className="p-3 text-[10px] font-mono overflow-x-auto whitespace-pre-wrap break-all"
+            style={{ color: "var(--text-secondary)", maxHeight: "320px", overflowY: "auto" }}
+          >
+            {r.rawResponse}
+          </pre>
+        </div>
+      )}
     </div>
   );
 }

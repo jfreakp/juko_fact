@@ -35,7 +35,9 @@ function getSRIEndpoints() {
   };
 }
 
-const USE_MOCK = process.env.SRI_USE_MOCK !== "false";
+// USE_MOCK=true solo cuando se define explícitamente SRI_USE_MOCK=true.
+// Por defecto (variable no definida) se llama al SRI real.
+const USE_MOCK = process.env.SRI_USE_MOCK === "true";
 
 export const sriService = {
   /**
@@ -78,6 +80,7 @@ export const sriService = {
         ptoEmi: invoice.company.ptoEmi,
         secuencial: invoice.secuencial,
         codigoNumerico,
+        tipoEmision: invoice.company.tipoEmision === "INDISPONIBILIDAD" ? "2" : "1",
       });
     }
 
@@ -135,7 +138,7 @@ export const sriService = {
     );
 
     return {
-      success: authResult.estado === "AUTORIZADA",
+      success: authResult.estado === "AUTORIZADO" || authResult.estado === "AUTORIZADA",
       estado: authResult.estado,
       numeroAutorizacion: authResult.numeroAutorizacion,
       fechaAutorizacion: authResult.fechaAutorizacion,
@@ -170,6 +173,7 @@ export const sriService = {
       await invoiceRepository.addSRIResponse(invoiceId, {
         tipo: "RECEPCION",
         estado: parsed.estado,
+        mensaje: parsed.mensaje,
         rawResponse: response.data,
       });
 
@@ -208,53 +212,85 @@ export const sriService = {
       return mockAuthorization(claveAcceso, invoiceId);
     }
 
-    try {
-      const soapEnvelope = buildAuthorizationSOAP(claveAcceso);
-      const url = getSRIEndpoints()[ambiente].autorizacion;
+    // SRI offline WS is asynchronous: reception queues the comprobante,
+    // authorization may need several seconds to reflect the result.
+    const MAX_RETRIES = 5;
+    const RETRY_DELAY_MS = 4000;
 
-      const response = await axios.post(url, soapEnvelope, {
-        headers: { "Content-Type": "text/xml; charset=UTF-8" },
-        timeout: 30000,
-        httpsAgent,
-      });
+    let lastRawResponse: string | undefined;
 
-      const parsed = parseAuthorizationResponse(response.data);
+    for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
+      try {
+        const soapEnvelope = buildAuthorizationSOAP(claveAcceso);
+        const url = getSRIEndpoints()[ambiente].autorizacion;
 
-      await invoiceRepository.addSRIResponse(invoiceId, {
-        tipo: "AUTORIZACION",
-        estado: parsed.estado,
-        rawResponse: response.data,
-      });
-
-      if (parsed.estado === "AUTORIZADA" && parsed.numeroAutorizacion) {
-        await invoiceRepository.updateSRI(invoiceId, {
-          estado: "AUTORIZADO",
-          numeroAutorizacion: parsed.numeroAutorizacion,
-          fechaAutorizacion: parsed.fechaAutorizacion,
-          xmlAutorizado: parsed.xmlAutorizado,
+        const response = await axios.post(url, soapEnvelope, {
+          headers: { "Content-Type": "text/xml; charset=UTF-8" },
+          timeout: 30000,
+          httpsAgent,
         });
-      } else {
-        await invoiceRepository.updateSRI(invoiceId, { estado: "RECHAZADO" });
-      }
 
-      return parsed;
-    } catch (err) {
-      let message = err instanceof Error ? err.message : "Error de autorización";
-      let rawResponse: string | undefined;
-      if (axios.isAxiosError(err) && err.response?.data) {
-        rawResponse = String(err.response.data);
-        const faultMatch = rawResponse.match(/<faultstring[^>]*>([^<]+)<\/faultstring>/);
-        if (faultMatch) message = `SOAP Fault: ${faultMatch[1]}`;
-        else message = `HTTP ${err.response.status}: ${rawResponse.slice(0, 300)}`;
+        lastRawResponse = response.data;
+        const parsed = parseAuthorizationResponse(response.data);
+
+        // SRI hasn't processed the comprobante yet — wait and retry
+        if (parsed.estado === "EN_PROCESO" && attempt < MAX_RETRIES) {
+          await new Promise((r) => setTimeout(r, RETRY_DELAY_MS));
+          continue;
+        }
+
+        await invoiceRepository.addSRIResponse(invoiceId, {
+          tipo: "AUTORIZACION",
+          estado: parsed.estado,
+          mensaje: parsed.mensaje,
+          rawResponse: response.data,
+        });
+
+        // SRI returns "AUTORIZADO" (not "AUTORIZADA")
+        if ((parsed.estado === "AUTORIZADO" || parsed.estado === "AUTORIZADA") && parsed.numeroAutorizacion) {
+          await invoiceRepository.updateSRI(invoiceId, {
+            estado: "AUTORIZADO",
+            numeroAutorizacion: parsed.numeroAutorizacion,
+            fechaAutorizacion: parsed.fechaAutorizacion,
+            xmlAutorizado: parsed.xmlAutorizado,
+          });
+        } else if (parsed.estado === "EN_PROCESO") {
+          // After all retries the SRI still hasn't processed it.
+          // Keep as ENVIADO so the user can query again later.
+          await invoiceRepository.updateSRI(invoiceId, { estado: "ENVIADO" });
+        } else {
+          await invoiceRepository.updateSRI(invoiceId, { estado: "RECHAZADO" });
+        }
+
+        return parsed;
+      } catch (err) {
+        let message = err instanceof Error ? err.message : "Error de autorización";
+        let rawResponse: string | undefined;
+        if (axios.isAxiosError(err) && err.response?.data) {
+          rawResponse = String(err.response.data);
+          const faultMatch = rawResponse.match(/<faultstring[^>]*>([^<]+)<\/faultstring>/);
+          if (faultMatch) message = `SOAP Fault: ${faultMatch[1]}`;
+          else message = `HTTP ${err.response.status}: ${rawResponse.slice(0, 300)}`;
+        }
+        await invoiceRepository.addSRIResponse(invoiceId, {
+          tipo: "AUTORIZACION",
+          estado: "ERROR",
+          mensaje: message,
+          rawResponse,
+        });
+        throw new Error(`Error autorizando comprobante: ${message}`);
       }
-      await invoiceRepository.addSRIResponse(invoiceId, {
-        tipo: "AUTORIZACION",
-        estado: "ERROR",
-        mensaje: message,
-        rawResponse,
-      });
-      throw new Error(`Error autorizando comprobante: ${message}`);
     }
+
+    // Exhausted retries without a definitive response — log and leave as ENVIADO
+    await invoiceRepository.addSRIResponse(invoiceId, {
+      tipo: "AUTORIZACION",
+      estado: "EN_PROCESO",
+      mensaje: `SRI no procesó el comprobante después de ${MAX_RETRIES} intentos`,
+      rawResponse: lastRawResponse,
+    });
+    await invoiceRepository.updateSRI(invoiceId, { estado: "ENVIADO" });
+    return { estado: "EN_PROCESO" };
   },
 };
 
@@ -313,17 +349,38 @@ function parseAuthorizationResponse(xml: string): {
   numeroAutorizacion?: string;
   fechaAutorizacion?: Date;
   xmlAutorizado?: string;
+  mensaje?: string;
 } {
+  // <numeroComprobantes>0</numeroComprobantes> means SRI hasn't processed it yet
+  const numComprobantesMatch = xml.match(/<numeroComprobantes>([^<]+)<\/numeroComprobantes>/);
+  if (numComprobantesMatch?.[1] === "0") {
+    return { estado: "EN_PROCESO", mensaje: "El SRI aún no ha procesado el comprobante" };
+  }
+
   const stateMatch = xml.match(/<estado>([^<]+)<\/estado>/);
   const numMatch = xml.match(/<numeroAutorizacion>([^<]+)<\/numeroAutorizacion>/);
   const fechaMatch = xml.match(/<fechaAutorizacion>([^<]+)<\/fechaAutorizacion>/);
   const comprobanteMatch = xml.match(/<comprobante><!\[CDATA\[([\s\S]*?)\]\]><\/comprobante>/);
+
+  // Extraer mensajes de error/advertencia del SRI (rechazo, NO_AUTORIZADA, etc.)
+  const errores: string[] = [];
+  const msgRegex = /<mensaje[^>]*>([\s\S]*?)<\/mensaje>/g;
+  let m;
+  while ((m = msgRegex.exec(xml)) !== null) {
+    const block = m[1];
+    const id = block.match(/<identificador>([^<]+)<\/identificador>/)?.[1];
+    const msg = block.match(/<mensaje>([^<]+)<\/mensaje>/)?.[1];
+    const info = block.match(/<informacionAdicional>([^<]+)<\/informacionAdicional>/)?.[1];
+    const tipo = block.match(/<tipo>([^<]+)<\/tipo>/)?.[1];
+    if (msg) errores.push(`[${id ?? "?"}][${tipo ?? "?"}] ${msg}${info ? ` (${info})` : ""}`);
+  }
 
   return {
     estado: stateMatch?.[1] ?? "NO_AUTORIZADA",
     numeroAutorizacion: numMatch?.[1],
     fechaAutorizacion: fechaMatch?.[1] ? new Date(fechaMatch[1]) : undefined,
     xmlAutorizado: comprobanteMatch?.[1],
+    mensaje: errores.length > 0 ? errores.join(" | ") : undefined,
   };
 }
 
@@ -342,6 +399,7 @@ async function mockReception(
     mensaje: "RECIBIDA (simulado)",
     rawResponse: `<estado>RECIBIDA</estado><claveAcceso>${claveAcceso}</claveAcceso>`,
   });
+  246169
 
   return { estado: "RECIBIDA" };
 }

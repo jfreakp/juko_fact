@@ -14,6 +14,7 @@ const updateSchema = z.object({
   obligadoContab: z.boolean().optional(),
   ambiente: z.enum(["PRUEBAS", "PRODUCCION"]).optional(),
   tipoEmision: z.enum(["NORMAL", "INDISPONIBILIDAD"]).optional(),
+  secuencialInicio: z.number().int().min(1).optional(),
 });
 
 export async function GET(req: NextRequest) {

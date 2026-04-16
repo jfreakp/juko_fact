@@ -84,6 +84,9 @@ model Company {
   ambiente         Ambiente    @default(PRUEBAS)
   tipoEmision      TipoEmision @default(NORMAL)
   logoUrl          String?
+  // Número desde el que inicia la secuencia de comprobantes.
+  // El sistema emite desde este número y continúa incrementando.
+  secuencialInicio        Int         @default(1)
   // Contador secuencial del codigoNumerico para generación de claveAcceso SRI.
   // Se incrementa atómicamente con cada comprobante emitido.
   codigoNumericoSiguiente Int         @default(1)

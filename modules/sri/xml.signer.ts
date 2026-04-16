@@ -1,17 +1,19 @@
 import forge from "node-forge";
-import { create } from "xmlbuilder2";
 import type { XAdESSignatureConfig } from "@/types";
 
 /**
  * Signs an XML document using XAdES-BES format as required by SRI Ecuador.
  *
- * Process:
- * 1. Load the P12 certificate and extract private key + certificate chain
- * 2. Compute SHA-1 digest of the XML document
- * 3. Build the ds:SignedInfo element
- * 4. Sign the SignedInfo with RSA-SHA1
- * 5. Add XAdES qualifying properties (xades:QualifyingProperties)
- * 6. Return the signed XML
+ * Signature structure:
+ *  ds:Signature
+ *    ds:SignedInfo
+ *      ds:Reference URI="#comprobante"  ← digest of the <factura> element
+ *      ds:Reference URI="#SignedProps"  ← digest of xades:SignedProperties
+ *    ds:SignatureValue                  ← RSA-SHA1 of canonicalized SignedInfo
+ *    ds:KeyInfo                         ← X509 cert + RSA public key
+ *    ds:Object
+ *      xades:QualifyingProperties
+ *        xades:SignedProperties         ← signing time + cert digest
  */
 export function signXML(config: XAdESSignatureConfig): string {
   const { certificateData, certificatePassword, xmlContent } = config;
@@ -39,60 +41,150 @@ export function signXML(config: XAdESSignatureConfig): string {
   const signatureValueId = `SignatureValue-${signatureId}`;
   const referenceId = `Reference-${signatureId}`;
 
-  // ── 3. Compute digest of the document ────────────────────────────────────
-  const docDigest = digestSHA1(xmlContent);
-
-  // ── 4. Get certificate data ───────────────────────────────────────────────
+  // ── 3. Certificate data ───────────────────────────────────────────────────
   const certDer = forge.asn1.toDer(forge.pki.certificateToAsn1(certificate)).getBytes();
   const certBase64 = forge.util.encode64(certDer);
-  const certDigest = digestSHA1(certDer);
+  // Digest of certificate DER bytes (binary — no UTF-8 encoding)
+  const certDigest = digestSHA1Binary(certDer);
 
-  const issuerName = getRFC2253Name(certificate.issuer as { attributes: { shortName?: string; value: string }[] });
-  const serialNumber = certificate.serialNumber.replace(/^0+/, "");
-
+  const issuerName = getRFC2253Name(
+    certificate.issuer as { attributes: { shortName?: string; value: string }[] }
+  );
+  // Serial number: convert hex to decimal (BigInt) as required by XAdES
+  const serialNumber = BigInt("0x" + certificate.serialNumber).toString(10);
   const signingTime = new Date().toISOString();
 
-  // ── 5. Build SignedInfo ───────────────────────────────────────────────────
-  const signedInfoXml = buildSignedInfo(
-    signatureId,
-    signedPropertiesId,
-    keyInfoId,
-    referenceId,
-    docDigest,
-    xmlContent
-  );
+  // RSA public key components (base64 of big-endian bytes, no DER sign-extension byte)
+  const pubKey = certificate.publicKey as forge.pki.rsa.PublicKey;
+  const modulus = bigIntToBase64(pubKey.n.toString(16));
+  const exponent = bigIntToBase64(pubKey.e.toString(16));
 
-  // ── 6. Sign the SignedInfo ────────────────────────────────────────────────
+  // ── 4. Strip XML declaration — docBody IS the #comprobante element ────────
+  // The enveloped-signature transform removes <ds:Signature> before verifying,
+  // but since we compute the digest BEFORE adding the signature, docBody is
+  // already the clean content the SRI will verify against.
+  const docBody = xmlContent.replace(/<\?xml[^?]*\?>\s*/i, "");
+
+  // ── 5. Digest of #comprobante (UTF-8 bytes of the element) ───────────────
+  const docDigest = digestSHA1UTF8(docBody);
+
+  // ── 6. Build xades:SignedProperties ──────────────────────────────────────
+  // Must include xmlns:ds and xmlns:xades explicitly because when the SRI
+  // canonicalizes this element from the complete document, those namespaces are
+  // in scope from ancestor elements and will appear in the canonical form.
+  const signedPropsXml =
+    `<xades:SignedProperties` +
+    ` xmlns:ds="http://www.w3.org/2000/09/xmldsig#"` +
+    ` xmlns:xades="http://uri.etsi.org/01903/v1.3.2#"` +
+    ` Id="${signedPropertiesId}">` +
+    `<xades:SignedSignatureProperties>` +
+    `<xades:SigningTime>${signingTime}</xades:SigningTime>` +
+    `<xades:SigningCertificate>` +
+    `<xades:Cert>` +
+    `<xades:CertDigest>` +
+    `<ds:DigestMethod Algorithm="http://www.w3.org/2000/09/xmldsig#sha1"></ds:DigestMethod>` +
+    `<ds:DigestValue>${certDigest}</ds:DigestValue>` +
+    `</xades:CertDigest>` +
+    `<xades:IssuerSerial>` +
+    `<ds:X509IssuerName>${escapeXml(issuerName)}</ds:X509IssuerName>` +
+    `<ds:X509SerialNumber>${serialNumber}</ds:X509SerialNumber>` +
+    `</xades:IssuerSerial>` +
+    `</xades:Cert>` +
+    `</xades:SigningCertificate>` +
+    `<xades:SignaturePolicyIdentifier>` +
+    `<xades:SignaturePolicyImplied></xades:SignaturePolicyImplied>` +
+    `</xades:SignaturePolicyIdentifier>` +
+    `</xades:SignedSignatureProperties>` +
+    `</xades:SignedProperties>`;
+
+  // ── 7. Digest of SignedProperties (UTF-8 bytes) ───────────────────────────
+  const signedPropsDigest = digestSHA1UTF8(signedPropsXml);
+
+  // ── 8. Build SignedInfo ───────────────────────────────────────────────────
+  // IMPORTANT:
+  //   - URI="#comprobante" — signs the <factura id="comprobante"> element
+  //   - Each Reference has its OWN distinct DigestValue (docDigest ≠ signedPropsDigest)
+  //   - NO xmlns:ds here: the SRI verifier applies C14N to ds:SignedInfo from within the
+  //     document where xmlns:ds is already declared on the parent ds:Signature.
+  //     C14N omits redundant namespace declarations, so we must sign the element
+  //     WITHOUT xmlns:ds to match the canonical bytes the verifier will compute.
+  // C14N (Canonical XML 1.0) requirements for the string we sign:
+  //   1. xmlns:ds MUST be present — C14N for the APEX element of a subset renders ALL
+  //      in-scope namespace declarations, even those already declared on an ancestor
+  //      that is outside the subset being canonicalized.
+  //   2. Self-closing tags MUST be expanded — C14N always emits explicit open/close form.
+  const signedInfoXml =
+    `<ds:SignedInfo xmlns:ds="http://www.w3.org/2000/09/xmldsig#">` +
+    `<ds:CanonicalizationMethod Algorithm="http://www.w3.org/TR/2001/REC-xml-c14n-20010315"></ds:CanonicalizationMethod>` +
+    `<ds:SignatureMethod Algorithm="http://www.w3.org/2000/09/xmldsig#rsa-sha1"></ds:SignatureMethod>` +
+    `<ds:Reference Id="${referenceId}" URI="#comprobante">` +
+    `<ds:Transforms>` +
+    `<ds:Transform Algorithm="http://www.w3.org/2000/09/xmldsig#enveloped-signature"></ds:Transform>` +
+    `</ds:Transforms>` +
+    `<ds:DigestMethod Algorithm="http://www.w3.org/2000/09/xmldsig#sha1"></ds:DigestMethod>` +
+    `<ds:DigestValue>${docDigest}</ds:DigestValue>` +
+    `</ds:Reference>` +
+    `<ds:Reference Type="http://uri.etsi.org/01903#SignedProperties"` +
+    ` URI="#${signedPropertiesId}">` +
+    `<ds:DigestMethod Algorithm="http://www.w3.org/2000/09/xmldsig#sha1"></ds:DigestMethod>` +
+    `<ds:DigestValue>${signedPropsDigest}</ds:DigestValue>` +
+    `</ds:Reference>` +
+    `</ds:SignedInfo>`;
+
+  // ── 9. Sign the SignedInfo (RSA-SHA1 of the UTF-8 bytes) ──────────────────
   const md = forge.md.sha1.create();
   md.update(signedInfoXml, "utf8");
-  const signature = privateKey.sign(md);
-  const signatureBase64 = forge.util.encode64(signature);
+  const signatureBytes = privateKey.sign(md);
+  const signatureBase64 = forge.util.encode64(signatureBytes);
 
-  // ── 7. Build the complete signed XML ─────────────────────────────────────
-  return buildSignedXML({
-    originalXml: xmlContent,
-    signatureId,
-    signedPropertiesId,
-    keyInfoId,
-    signatureValueId,
-    referenceId,
-    docDigest,
-    certBase64,
-    certDigest,
-    issuerName,
-    serialNumber,
-    signingTime,
-    signedInfoXml,
-    signatureBase64,
-  });
+  // ── 10. Assemble the complete ds:Signature block ──────────────────────────
+  const signatureBlock =
+    `<ds:Signature xmlns:ds="http://www.w3.org/2000/09/xmldsig#" Id="${signatureId}">` +
+    signedInfoXml +
+    `<ds:SignatureValue Id="${signatureValueId}">${signatureBase64}</ds:SignatureValue>` +
+    `<ds:KeyInfo Id="${keyInfoId}">` +
+    `<ds:X509Data>` +
+    `<ds:X509Certificate>${certBase64}</ds:X509Certificate>` +
+    `</ds:X509Data>` +
+    `<ds:KeyValue>` +
+    `<ds:RSAKeyValue>` +
+    `<ds:Modulus>${modulus}</ds:Modulus>` +
+    `<ds:Exponent>${exponent}</ds:Exponent>` +
+    `</ds:RSAKeyValue>` +
+    `</ds:KeyValue>` +
+    `</ds:KeyInfo>` +
+    `<ds:Object Id="xades-${signatureId}">` +
+    `<xades:QualifyingProperties xmlns:xades="http://uri.etsi.org/01903/v1.3.2#"` +
+    ` Target="#${signatureId}">` +
+    signedPropsXml +
+    `</xades:QualifyingProperties>` +
+    `</ds:Object>` +
+    `</ds:Signature>`;
+
+  // ── 11. Inject signature before the closing tag of the root element ───────
+  return docBody.replace(/(<\/[^>]+>\s*)$/, `${signatureBlock}\n$1`);
 }
 
-// ─── helpers ──────────────────────────────────────────────────────────────────
+// ─── Helpers ──────────────────────────────────────────────────────────────────
 
-function digestSHA1(content: string): string {
+/** SHA-1 digest of a UTF-8 text string → base64 */
+function digestSHA1UTF8(text: string): string {
   const md = forge.md.sha1.create();
-  md.update(content, "utf8");
+  md.update(text, "utf8");
   return forge.util.encode64(md.digest().bytes());
+}
+
+/** SHA-1 digest of a forge binary string (raw bytes) → base64 */
+function digestSHA1Binary(binaryStr: string): string {
+  const md = forge.md.sha1.create();
+  md.update(binaryStr); // no encoding = raw binary
+  return forge.util.encode64(md.digest().bytes());
+}
+
+/** Converts a hex string (big-endian integer) to base64 (no DER sign-extension byte) */
+function bigIntToBase64(hex: string): string {
+  const padded = hex.length % 2 === 0 ? hex : "0" + hex;
+  return forge.util.encode64(forge.util.hexToBytes(padded));
 }
 
 function randomId(): string {
@@ -106,95 +198,11 @@ function getRFC2253Name(name: { attributes: { shortName?: string; value: string 
     .join(",");
 }
 
-function buildSignedInfo(
-  signatureId: string,
-  signedPropertiesId: string,
-  keyInfoId: string,
-  referenceId: string,
-  docDigest: string,
-  _xmlContent: string
-): string {
-  const xadesRef = `#${signedPropertiesId}`;
-  const keyRef = `#${keyInfoId}`;
-
-  return `<ds:SignedInfo xmlns:ds="http://www.w3.org/2000/09/xmldsig#">` +
-    `<ds:CanonicalizationMethod Algorithm="http://www.w3.org/TR/2001/REC-xml-c14n-20010315"/>` +
-    `<ds:SignatureMethod Algorithm="http://www.w3.org/2000/09/xmldsig#rsa-sha1"/>` +
-    `<ds:Reference Id="${referenceId}" URI="">` +
-    `<ds:Transforms>` +
-    `<ds:Transform Algorithm="http://www.w3.org/2000/09/xmldsig#enveloped-signature"/>` +
-    `</ds:Transforms>` +
-    `<ds:DigestMethod Algorithm="http://www.w3.org/2000/09/xmldsig#sha1"/>` +
-    `<ds:DigestValue>${docDigest}</ds:DigestValue>` +
-    `</ds:Reference>` +
-    `<ds:Reference Type="http://uri.etsi.org/01903#SignedProperties" URI="${xadesRef}">` +
-    `<ds:DigestMethod Algorithm="http://www.w3.org/2000/09/xmldsig#sha1"/>` +
-    `<ds:DigestValue>${docDigest}</ds:DigestValue>` +
-    `</ds:Reference>` +
-    `</ds:SignedInfo>`;
-}
-
-interface SignedXMLParams {
-  originalXml: string;
-  signatureId: string;
-  signedPropertiesId: string;
-  keyInfoId: string;
-  signatureValueId: string;
-  referenceId: string;
-  docDigest: string;
-  certBase64: string;
-  certDigest: string;
-  issuerName: string;
-  serialNumber: string;
-  signingTime: string;
-  signedInfoXml: string;
-  signatureBase64: string;
-}
-
-function buildSignedXML(p: SignedXMLParams): string {
-  // Strip XML declaration from original if present
-  const xmlBody = p.originalXml.replace(/<\?xml[^?]*\?>\s*/i, "");
-
-  const signatureBlock = `<ds:Signature xmlns:ds="http://www.w3.org/2000/09/xmldsig#" Id="${p.signatureId}">
-  ${p.signedInfoXml}
-  <ds:SignatureValue Id="${p.signatureValueId}">${p.signatureBase64}</ds:SignatureValue>
-  <ds:KeyInfo Id="${p.keyInfoId}">
-    <ds:X509Data>
-      <ds:X509Certificate>${p.certBase64}</ds:X509Certificate>
-    </ds:X509Data>
-    <ds:KeyValue>
-      <ds:RSAKeyValue>
-        <ds:Modulus></ds:Modulus>
-        <ds:Exponent></ds:Exponent>
-      </ds:RSAKeyValue>
-    </ds:KeyValue>
-  </ds:KeyInfo>
-  <ds:Object Id="xades-${p.signatureId}">
-    <xades:QualifyingProperties xmlns:xades="http://uri.etsi.org/01903/v1.3.2#" Target="#${p.signatureId}">
-      <xades:SignedProperties Id="${p.signedPropertiesId}">
-        <xades:SignedSignatureProperties>
-          <xades:SigningTime>${p.signingTime}</xades:SigningTime>
-          <xades:SigningCertificate>
-            <xades:Cert>
-              <xades:CertDigest>
-                <ds:DigestMethod Algorithm="http://www.w3.org/2000/09/xmldsig#sha1"/>
-                <ds:DigestValue>${p.certDigest}</ds:DigestValue>
-              </xades:CertDigest>
-              <xades:IssuerSerial>
-                <ds:X509IssuerName>${p.issuerName}</ds:X509IssuerName>
-                <ds:X509SerialNumber>${p.serialNumber}</ds:X509SerialNumber>
-              </xades:IssuerSerial>
-            </xades:Cert>
-          </xades:SigningCertificate>
-          <xades:SignaturePolicyIdentifier>
-            <xades:SignaturePolicyImplied/>
-          </xades:SignaturePolicyIdentifier>
-        </xades:SignedSignatureProperties>
-      </xades:SignedProperties>
-    </xades:QualifyingProperties>
-  </ds:Object>
-</ds:Signature>`;
-
-  // Inject signature before the closing tag of the root element
-  return xmlBody.replace(/(<\/[^>]+>\s*)$/, `${signatureBlock}\n$1`);
+function escapeXml(str: string): string {
+  return str
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&apos;");
 }

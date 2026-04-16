@@ -26,7 +26,17 @@
       "Bash(findstr \":3000\")",
       "Bash(pnpm next:*)",
       "Bash(grep -l \"already running\\\\|PID\\\\|dev-server\" node_modules/next/dist/server/dev/*.js)",
-      "Bash(grep -v \"^$\")"
+      "Bash(grep -v \"^$\")",
+      "Bash(xargs grep:*)",
+      "Bash(curl -s http://localhost:3000/api/health)",
+      "Bash(PGPASSWORD=jukofact_pass psql -h localhost -U jukofact -d jukofact -c \"SELECT i.id, i.secuencial, i.estado, i.\\\\\"claveAcceso\\\\\", i.\\\\\"companyId\\\\\", c.ruc, c.ambiente FROM \\\\\"Invoice\\\\\" i JOIN \\\\\"Company\\\\\" c ON c.id = i.\\\\\"companyId\\\\\" ORDER BY i.\\\\\"createdAt\\\\\" DESC LIMIT 5;\")",
+      "Bash(node --require dotenv/config -e ':*)",
+      "Bash(npx ts-node --project tsconfig.json -e ':*)",
+      "Bash(npx ts-node:*)",
+      "Bash(node scripts/test-sri.js)",
+      "Bash(node scripts/check-digest.js cmo1ycslh000mxktzra3am6o5)",
+      "Bash(node -e \"require\\('xml-crypto'\\); console.log\\('xml-crypto available'\\)\")",
+      "Bash(node -e \"require\\('@xmldom/xmldom'\\); console.log\\('xmldom available'\\)\")"
     ]
   }
 }

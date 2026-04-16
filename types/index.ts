@@ -47,6 +47,8 @@ export type UpdateCompanyDTO = {
   obligadoContab?: boolean;
   ambiente?: "PRUEBAS" | "PRODUCCION";
   tipoEmision?: "NORMAL" | "INDISPONIBILIDAD";
+  logoUrl?: string | null;
+  secuencialInicio?: number;
 };
 
 export type CreateClientDTO = {

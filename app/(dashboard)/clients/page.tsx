@@ -58,9 +58,7 @@ export default function ClientsPage() {
     setLoading(false);
   }
 
-  useEffect(() => {
-    loadClients();
-  }, [search]);
+  useEffect(() => { loadClients(); }, [search]);
 
   function openCreate() {
     setEditClient(null);
@@ -84,20 +82,16 @@ export default function ClientsPage() {
   async function handleSubmit(e: FormEvent) {
     e.preventDefault();
     setSaving(true);
-
     try {
       const url = editClient ? `/api/clients/${editClient.id}` : "/api/clients";
       const method = editClient ? "PUT" : "POST";
-
       const res = await fetch(url, {
         method,
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(form),
       });
       const data = await res.json();
-
       if (!data.success) throw new Error(data.error);
-
       success(editClient ? "Cliente actualizado" : "Cliente creado exitosamente");
       setModalOpen(false);
       loadClients();
@@ -121,64 +115,91 @@ export default function ClientsPage() {
   }
 
   return (
-    <div>
+    <div style={{ background: "var(--surface)" }} className="min-h-screen p-8">
       <Header
         title="Clientes"
-        subtitle="Gestión de clientes del sistema"
+        subtitle={`Gestión de ${clients.length} socios comerciales activos`}
         action={<Button onClick={openCreate}>+ Nuevo Cliente</Button>}
       />
 
       {/* Search */}
-      <div className="mb-4">
+      <div className="mb-6 max-w-sm">
         <Input
-          placeholder="Buscar por nombre, identificación o email..."
+          placeholder="Buscar cliente, RUC o email..."
           value={search}
           onChange={(e) => setSearch(e.target.value)}
-          className="max-w-md"
         />
       </div>
 
       {/* Table */}
-      <div className="bg-white rounded-xl shadow-sm border overflow-hidden">
+      <div className="rounded-xl overflow-hidden" style={{ background: "var(--surface-white)" }}>
         {loading ? (
-          <div className="p-8 text-center text-gray-400">Cargando...</div>
+          <div className="p-8 space-y-3">
+            {[1, 2, 3, 4].map((i) => <div key={i} className="skeleton h-12 rounded-lg" />)}
+          </div>
         ) : clients.length === 0 ? (
-          <div className="p-8 text-center">
-            <p className="text-gray-400 mb-3">No hay clientes registrados</p>
+          <div className="p-16 text-center">
+            <div
+              className="w-12 h-12 rounded-xl mx-auto mb-4 flex items-center justify-center"
+              style={{ background: "var(--surface-low)" }}
+            >
+              <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}
+                style={{ color: "var(--text-muted)" }}>
+                <path strokeLinecap="round" strokeLinejoin="round"
+                  d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z" />
+              </svg>
+            </div>
+            <p className="text-sm font-bold mb-1" style={{ color: "var(--text-base)" }}>Sin clientes</p>
+            <p className="text-[11px] font-medium mb-5" style={{ color: "var(--text-muted)" }}>
+              Registre su primer socio comercial
+            </p>
             <Button size="sm" onClick={openCreate}>Agregar primer cliente</Button>
           </div>
         ) : (
           <table className="w-full">
             <thead>
-              <tr className="bg-gray-50 text-xs font-medium text-gray-500 uppercase">
-                <th className="px-6 py-3 text-left">Tipo</th>
-                <th className="px-6 py-3 text-left">Identificación</th>
-                <th className="px-6 py-3 text-left">Razón Social</th>
-                <th className="px-6 py-3 text-left">Email</th>
-                <th className="px-6 py-3 text-left">Teléfono</th>
-                <th className="px-6 py-3 text-right">Acciones</th>
+              <tr style={{ background: "var(--surface-low)" }}>
+                {["Tipo", "Identificación", "Razón Social", "Email", "Teléfono", ""].map((h) => (
+                  <th
+                    key={h}
+                    className={`px-6 py-3 text-left text-[9px] font-bold tracking-[0.15em] uppercase ${h === "" ? "text-right" : ""}`}
+                    style={{ color: "var(--text-muted)" }}
+                  >
+                    {h}
+                  </th>
+                ))}
               </tr>
             </thead>
-            <tbody className="divide-y divide-gray-100">
-              {clients.map((c) => (
-                <tr key={c.id} className="hover:bg-gray-50">
-                  <td className="px-6 py-3 text-sm">
-                    <span className="px-2 py-1 bg-blue-100 text-blue-700 rounded text-xs font-medium">
+            <tbody>
+              {clients.map((c, idx) => (
+                <tr
+                  key={c.id}
+                  style={{ background: idx % 2 === 0 ? "var(--surface-white)" : "var(--surface)" }}
+                >
+                  <td className="px-6 py-3.5">
+                    <span
+                      className="px-2 py-0.5 rounded text-[10px] font-bold tracking-widest uppercase"
+                      style={{ background: "var(--info-bg)", color: "var(--info-text)" }}
+                    >
                       {TIPO_IDENTIF_LABEL[c.tipoIdentif]}
                     </span>
                   </td>
-                  <td className="px-6 py-3 text-sm font-mono text-gray-900">{c.identificacion}</td>
-                  <td className="px-6 py-3 text-sm text-gray-900 font-medium">{c.razonSocial}</td>
-                  <td className="px-6 py-3 text-sm text-gray-500">{c.email ?? "—"}</td>
-                  <td className="px-6 py-3 text-sm text-gray-500">{c.telefono ?? "—"}</td>
-                  <td className="px-6 py-3 text-right">
+                  <td className="px-6 py-3.5 font-mono text-sm font-semibold" style={{ color: "var(--text-base)" }}>
+                    {c.identificacion}
+                  </td>
+                  <td className="px-6 py-3.5 text-sm font-bold" style={{ color: "var(--text-base)" }}>
+                    {c.razonSocial}
+                  </td>
+                  <td className="px-6 py-3.5 text-sm" style={{ color: "var(--text-muted)" }}>
+                    {c.email ?? "—"}
+                  </td>
+                  <td className="px-6 py-3.5 text-sm" style={{ color: "var(--text-muted)" }}>
+                    {c.telefono ?? "—"}
+                  </td>
+                  <td className="px-6 py-3.5 text-right">
                     <div className="flex justify-end gap-2">
-                      <Button size="sm" variant="ghost" onClick={() => openEdit(c)}>
-                        Editar
-                      </Button>
-                      <Button size="sm" variant="danger" onClick={() => handleDelete(c.id)}>
-                        Eliminar
-                      </Button>
+                      <Button size="sm" variant="ghost" onClick={() => openEdit(c)}>Editar</Button>
+                      <Button size="sm" variant="danger" onClick={() => handleDelete(c.id)}>Eliminar</Button>
                     </div>
                   </td>
                 </tr>
@@ -235,7 +256,7 @@ export default function ClientsPage() {
             placeholder="Dirección del cliente"
           />
           <div className="flex justify-end gap-3 pt-2">
-            <Button variant="secondary" type="button" onClick={() => setModalOpen(false)}>
+            <Button variant="ghost" type="button" onClick={() => setModalOpen(false)}>
               Cancelar
             </Button>
             <Button type="submit" loading={saving}>

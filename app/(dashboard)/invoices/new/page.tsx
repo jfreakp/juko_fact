@@ -191,12 +191,12 @@ export default function NewInvoicePage() {
     );
 
   return (
-    <div>
+    <div style={{ background: "var(--surface)" }} className="min-h-screen p-8">
       <Header
         title="Nueva Factura"
         subtitle="Crear comprobante electrónico"
         action={
-          <Button variant="secondary" onClick={() => router.back()}>
+          <Button variant="ghost" onClick={() => router.back()}>
             ← Volver
           </Button>
         }
@@ -205,8 +205,13 @@ export default function NewInvoicePage() {
       <form onSubmit={handleSubmit}>
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-6">
           {/* Left: client + fecha */}
-          <div className="lg:col-span-2 bg-white rounded-xl shadow-sm border p-6 space-y-4">
-            <h2 className="font-semibold text-gray-900">Datos del Comprobante</h2>
+          <div
+            className="lg:col-span-2 rounded-xl p-6 space-y-4"
+            style={{ background: "var(--surface-white)" }}
+          >
+            <p className="text-[10px] font-bold tracking-[0.15em] uppercase" style={{ color: "var(--text-muted)" }}>
+              Datos del Comprobante
+            </p>
             <div className="grid grid-cols-2 gap-4">
               <div className="col-span-2">
                 <Select
@@ -225,53 +230,69 @@ export default function NewInvoicePage() {
               />
             </div>
             <div>
-              <label className="text-sm font-medium text-gray-700">Observaciones</label>
+              <label
+                className="text-[11px] font-bold tracking-widest uppercase block mb-1"
+                style={{ color: "var(--text-secondary)" }}
+              >
+                Observaciones
+              </label>
               <textarea
-                className="mt-1 w-full px-3 py-2 border border-gray-300 rounded-lg text-sm resize-none
-                  focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className="w-full px-3 py-2.5 rounded-xl text-sm font-medium resize-none outline-none transition-colors"
+                style={{
+                  background: "var(--surface-white)",
+                  color: "var(--text-base)",
+                  border: "2px solid var(--border-subtle)",
+                }}
                 rows={2}
                 value={observaciones}
                 onChange={(e) => setObservaciones(e.target.value)}
                 placeholder="Observaciones adicionales (opcional)"
+                onFocus={(e) => (e.currentTarget.style.borderColor = "var(--primary-focus)")}
+                onBlur={(e) => (e.currentTarget.style.borderColor = "var(--border-subtle)")}
               />
             </div>
           </div>
 
           {/* Right: totals */}
-          <div className="bg-white rounded-xl shadow-sm border p-6">
-            <h2 className="font-semibold text-gray-900 mb-4">Resumen</h2>
-            <div className="space-y-3">
-              <div className="flex justify-between text-sm">
-                <span className="text-gray-500">Subtotal</span>
-                <span className="font-medium">${totals.subtotal.toFixed(2)}</span>
+          <div className="rounded-xl p-6" style={{ background: "var(--surface-white)" }}>
+            <p className="text-[10px] font-bold tracking-[0.15em] uppercase mb-4" style={{ color: "var(--text-muted)" }}>
+              Resumen
+            </p>
+            <div className="space-y-3 text-sm">
+              <div className="flex justify-between">
+                <span style={{ color: "var(--text-muted)" }}>Subtotal</span>
+                <span className="font-semibold" style={{ color: "var(--text-base)" }}>${totals.subtotal.toFixed(2)}</span>
               </div>
-              <div className="flex justify-between text-sm">
-                <span className="text-gray-500">IVA</span>
-                <span className="font-medium">${totals.iva.toFixed(2)}</span>
+              <div className="flex justify-between">
+                <span style={{ color: "var(--text-muted)" }}>IVA</span>
+                <span className="font-semibold" style={{ color: "var(--text-base)" }}>${totals.iva.toFixed(2)}</span>
               </div>
-              <div className="border-t pt-3 flex justify-between">
-                <span className="font-semibold text-gray-900">Total</span>
-                <span className="font-bold text-xl text-blue-600">
+              <div
+                className="pt-3 flex justify-between"
+                style={{ borderTop: "2px solid var(--surface-highest)" }}
+              >
+                <span className="font-black tracking-widest uppercase text-xs" style={{ color: "var(--text-base)" }}>Total</span>
+                <span className="font-black text-xl" style={{ color: "var(--primary-focus)" }}>
                   ${totals.total.toFixed(2)}
                 </span>
               </div>
             </div>
 
-            <Button
-              type="submit"
-              className="w-full mt-6"
-              size="lg"
-              loading={saving}
-            >
+            <Button type="submit" className="w-full mt-6" size="lg" loading={saving}>
               Crear Factura
             </Button>
           </div>
         </div>
 
         {/* Details table */}
-        <div className="bg-white rounded-xl shadow-sm border overflow-hidden">
-          <div className="px-6 py-4 border-b flex items-center justify-between">
-            <h2 className="font-semibold text-gray-900">Detalles</h2>
+        <div className="rounded-xl overflow-hidden" style={{ background: "var(--surface-white)" }}>
+          <div
+            className="px-6 py-4 flex items-center justify-between"
+            style={{ borderBottom: "1px solid var(--surface-highest)" }}
+          >
+            <p className="text-[10px] font-bold tracking-[0.15em] uppercase" style={{ color: "var(--text-muted)" }}>
+              Detalles
+            </p>
             <Button size="sm" variant="secondary" type="button" onClick={addLine}>
               + Agregar línea
             </Button>
@@ -280,29 +301,39 @@ export default function NewInvoicePage() {
           <div className="overflow-x-auto">
             <table className="w-full min-w-[900px]">
               <thead>
-                <tr className="bg-gray-50 text-xs font-medium text-gray-500 uppercase">
-                  <th className="px-4 py-3 text-left w-48">Producto</th>
-                  <th className="px-4 py-3 text-left">Descripción</th>
-                  <th className="px-4 py-3 text-right w-20">Cant.</th>
-                  <th className="px-4 py-3 text-right w-28">P. Unit.</th>
-                  <th className="px-4 py-3 text-right w-24">Desc.</th>
-                  <th className="px-4 py-3 text-center w-28">IVA</th>
-                  <th className="px-4 py-3 text-right w-28">Subtotal</th>
-                  <th className="px-4 py-3 w-10"></th>
+                <tr style={{ background: "var(--surface-low)" }}>
+                  {["Producto", "Descripción", "Cant.", "P. Unit.", "Desc.", "IVA", "Subtotal", ""].map((h) => (
+                    <th
+                      key={h}
+                      className={`px-4 py-3 text-[9px] font-bold tracking-[0.15em] uppercase
+                        ${["Cant.", "P. Unit.", "Desc.", "Subtotal"].includes(h) ? "text-right"
+                          : h === "IVA" ? "text-center" : "text-left"}`}
+                      style={{ color: "var(--text-muted)" }}
+                    >
+                      {h}
+                    </th>
+                  ))}
                 </tr>
               </thead>
-              <tbody className="divide-y divide-gray-100">
-                {lines.map((line) => {
+              <tbody>
+                {lines.map((line, idx) => {
                   const { subtotal } = calcLine(line);
                   const pSearch = productSearch[line.id] ?? "";
                   const filtered = filteredProducts(pSearch);
+                  const cellStyle = {
+                    background: idx % 2 === 0 ? "var(--surface-white)" : "var(--surface)",
+                    border: "2px solid var(--border-subtle)",
+                    color: "var(--text-base)",
+                  };
+                  const inputCls = "w-full px-2 py-1.5 rounded-lg text-xs outline-none transition-colors";
 
                   return (
-                    <tr key={line.id}>
+                    <tr key={line.id} style={{ background: idx % 2 === 0 ? "var(--surface-white)" : "var(--surface)" }}>
                       {/* Product search */}
                       <td className="px-4 py-2 relative">
                         <input
-                          className="w-full px-2 py-1.5 border border-gray-300 rounded text-xs focus:outline-none focus:ring-1 focus:ring-blue-500"
+                          className={inputCls}
+                          style={cellStyle}
                           placeholder="Buscar..."
                           value={pSearch || line.codigoPrincipal}
                           onChange={(e) => {
@@ -311,80 +342,97 @@ export default function NewInvoicePage() {
                               updateLine(line.id, { productId: undefined, codigoPrincipal: "" });
                             }
                           }}
-                          onFocus={() =>
-                            setProductSearch((prev) => ({ ...prev, [line.id]: "" }))
-                          }
+                          onFocus={(e) => {
+                            setProductSearch((prev) => ({ ...prev, [line.id]: "" }));
+                            e.currentTarget.style.borderColor = "var(--primary-focus)";
+                          }}
+                          onBlur={(e) => (e.currentTarget.style.borderColor = "var(--border-subtle)")}
                         />
                         {pSearch && filtered.length > 0 && (
-                          <div className="absolute top-full left-0 z-10 w-64 bg-white border border-gray-200 rounded-lg shadow-lg max-h-48 overflow-y-auto">
+                          <div
+                            className="absolute top-full left-0 z-10 w-64 rounded-xl max-h-48 overflow-y-auto"
+                            style={{
+                              background: "var(--surface-white)",
+                              border: "2px solid var(--border-strong)",
+                            }}
+                          >
                             {filtered.slice(0, 8).map((p) => (
                               <button
                                 key={p.id}
                                 type="button"
-                                className="w-full text-left px-3 py-2 text-xs hover:bg-blue-50 border-b last:border-0"
+                                className="w-full text-left px-3 py-2 text-xs transition-colors"
+                                style={{ borderBottom: "1px solid var(--surface-highest)" }}
+                                onMouseEnter={(e) => (e.currentTarget.style.background = "var(--surface-low)")}
+                                onMouseLeave={(e) => (e.currentTarget.style.background = "transparent")}
                                 onClick={() => selectProduct(line.id, p)}
                               >
-                                <div className="font-medium">{p.descripcion}</div>
-                                <div className="text-gray-400">{p.codigoPrincipal} — ${Number(p.precio).toFixed(2)}</div>
+                                <div className="font-bold" style={{ color: "var(--text-base)" }}>{p.descripcion}</div>
+                                <div className="text-[10px]" style={{ color: "var(--text-muted)" }}>
+                                  {p.codigoPrincipal} — ${Number(p.precio).toFixed(2)}
+                                </div>
                               </button>
                             ))}
                           </div>
                         )}
                       </td>
 
-                      {/* Description */}
                       <td className="px-4 py-2">
                         <input
-                          className="w-full px-2 py-1.5 border border-gray-300 rounded text-xs focus:outline-none focus:ring-1 focus:ring-blue-500"
+                          className={inputCls}
+                          style={cellStyle}
                           value={line.descripcion}
                           onChange={(e) => updateLine(line.id, { descripcion: e.target.value })}
                           placeholder="Descripción"
                           required
+                          onFocus={(e) => (e.currentTarget.style.borderColor = "var(--primary-focus)")}
+                          onBlur={(e) => (e.currentTarget.style.borderColor = "var(--border-subtle)")}
                         />
                       </td>
 
-                      {/* Cantidad */}
                       <td className="px-4 py-2">
                         <input
-                          type="number"
-                          step="0.01"
-                          min="0.01"
-                          className="w-full px-2 py-1.5 border border-gray-300 rounded text-xs text-right focus:outline-none focus:ring-1 focus:ring-blue-500"
+                          type="number" step="0.01" min="0.01"
+                          className={`${inputCls} text-right`}
+                          style={cellStyle}
                           value={line.cantidad}
                           onChange={(e) => updateLine(line.id, { cantidad: e.target.value })}
+                          onFocus={(e) => (e.currentTarget.style.borderColor = "var(--primary-focus)")}
+                          onBlur={(e) => (e.currentTarget.style.borderColor = "var(--border-subtle)")}
                         />
                       </td>
 
-                      {/* Price */}
                       <td className="px-4 py-2">
                         <input
-                          type="number"
-                          step="0.01"
-                          min="0"
-                          className="w-full px-2 py-1.5 border border-gray-300 rounded text-xs text-right focus:outline-none focus:ring-1 focus:ring-blue-500"
+                          type="number" step="0.01" min="0"
+                          className={`${inputCls} text-right`}
+                          style={cellStyle}
                           value={line.precioUnitario}
                           onChange={(e) => updateLine(line.id, { precioUnitario: e.target.value })}
+                          onFocus={(e) => (e.currentTarget.style.borderColor = "var(--primary-focus)")}
+                          onBlur={(e) => (e.currentTarget.style.borderColor = "var(--border-subtle)")}
                         />
                       </td>
 
-                      {/* Descuento */}
                       <td className="px-4 py-2">
                         <input
-                          type="number"
-                          step="0.01"
-                          min="0"
-                          className="w-full px-2 py-1.5 border border-gray-300 rounded text-xs text-right focus:outline-none focus:ring-1 focus:ring-blue-500"
+                          type="number" step="0.01" min="0"
+                          className={`${inputCls} text-right`}
+                          style={cellStyle}
                           value={line.descuento}
                           onChange={(e) => updateLine(line.id, { descuento: e.target.value })}
+                          onFocus={(e) => (e.currentTarget.style.borderColor = "var(--primary-focus)")}
+                          onBlur={(e) => (e.currentTarget.style.borderColor = "var(--border-subtle)")}
                         />
                       </td>
 
-                      {/* IVA */}
                       <td className="px-4 py-2">
                         <select
-                          className="w-full px-2 py-1.5 border border-gray-300 rounded text-xs focus:outline-none focus:ring-1 focus:ring-blue-500"
+                          className={inputCls}
+                          style={cellStyle}
                           value={line.tipoIva}
                           onChange={(e) => updateLine(line.id, { tipoIva: e.target.value })}
+                          onFocus={(e) => (e.currentTarget.style.borderColor = "var(--primary-focus)")}
+                          onBlur={(e) => (e.currentTarget.style.borderColor = "var(--border-subtle)")}
                         >
                           {IVA_OPTIONS.map((o) => (
                             <option key={o.value} value={o.value}>{o.label}</option>
@@ -392,18 +440,17 @@ export default function NewInvoicePage() {
                         </select>
                       </td>
 
-                      {/* Subtotal */}
-                      <td className="px-4 py-2 text-right text-sm font-medium text-gray-900">
+                      <td className="px-4 py-2 text-right text-sm font-bold" style={{ color: "var(--text-base)" }}>
                         ${subtotal.toFixed(2)}
                       </td>
 
-                      {/* Remove */}
                       <td className="px-4 py-2 text-center">
                         {lines.length > 1 && (
                           <button
                             type="button"
                             onClick={() => removeLine(line.id)}
-                            className="text-red-400 hover:text-red-600 text-lg leading-none"
+                            className="text-lg leading-none font-bold transition-colors"
+                            style={{ color: "var(--error-text)" }}
                           >
                             ×
                           </button>

@@ -8,9 +8,9 @@ export default function DashboardLayout({
 }) {
   return (
     <ToastProvider>
-      <div className="flex min-h-screen bg-gray-50">
+      <div className="flex min-h-screen" style={{ background: "var(--surface-mid)" }}>
         <Sidebar />
-        <main className="flex-1 p-8 overflow-auto">{children}</main>
+        <main className="flex-1 overflow-auto">{children}</main>
       </div>
     </ToastProvider>
   );

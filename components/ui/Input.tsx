@@ -9,14 +9,15 @@ interface InputProps extends InputHTMLAttributes<HTMLInputElement> {
 }
 
 const Input = forwardRef<HTMLInputElement, InputProps>(
-  ({ label, error, helperText, className = "", id, ...props }, ref) => {
+  ({ label, error, helperText, className = "", id, style, ...props }, ref) => {
     const inputId = id ?? label?.toLowerCase().replace(/\s+/g, "-");
     return (
       <div className="flex flex-col gap-1">
         {label && (
           <label
             htmlFor={inputId}
-            className="text-sm font-medium text-gray-700"
+            className="text-[11px] font-bold tracking-widest uppercase"
+            style={{ color: "var(--text-secondary)" }}
           >
             {label}
           </label>
@@ -24,16 +25,34 @@ const Input = forwardRef<HTMLInputElement, InputProps>(
         <input
           id={inputId}
           ref={ref}
-          className={`px-3 py-2 border rounded-lg text-sm focus:outline-none focus:ring-2
-            focus:ring-blue-500 focus:border-transparent transition-colors
-            ${error ? "border-red-500 bg-red-50" : "border-gray-300 bg-white"}
-            disabled:bg-gray-100 disabled:cursor-not-allowed
+          className={`px-3 py-2.5 rounded-xl text-sm font-medium transition-colors outline-none
+            disabled:opacity-50 disabled:cursor-not-allowed
             ${className}`}
+          style={{
+            background: "var(--surface-white)",
+            color: "var(--text-base)",
+            border: error ? "2px solid var(--error-strong)" : "2px solid var(--border-subtle)",
+            ...style,
+          }}
+          onFocus={(e) => {
+            e.currentTarget.style.borderColor = error ? "var(--error-strong)" : "var(--primary-focus)";
+            props.onFocus?.(e);
+          }}
+          onBlur={(e) => {
+            e.currentTarget.style.borderColor = error ? "var(--error-strong)" : "var(--border-subtle)";
+            props.onBlur?.(e);
+          }}
           {...props}
         />
-        {error && <p className="text-xs text-red-600">{error}</p>}
+        {error && (
+          <p className="text-[11px] font-medium" style={{ color: "var(--error-strong)" }}>
+            {error}
+          </p>
+        )}
         {helperText && !error && (
-          <p className="text-xs text-gray-500">{helperText}</p>
+          <p className="text-[11px]" style={{ color: "var(--text-muted)" }}>
+            {helperText}
+          </p>
         )}
       </div>
     );

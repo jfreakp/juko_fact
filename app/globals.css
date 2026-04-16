@@ -1,15 +1,54 @@
 @import "tailwindcss";
 
+/* ─── Design Tokens: Industrial Precisionist ─── */
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  /* Surfaces */
+  --surface:                 #FCF9F8;
+  --surface-low:             #F6F3F2;
+  --surface-mid:             #F0EDEC;
+  --surface-high:            #EBE7E7;
+  --surface-highest:         #E5E2E1;
+  --surface-white:           #FFFFFF;
+
+  /* Brand */
+  --primary:                 #FFD700;
+  --primary-dim:             #E9C400;
+  --primary-light:           #FFE16D;
+  --on-primary:              #221B00;
+  --primary-focus:           #705D00;
+
+  /* Text */
+  --text-base:               #1C1B1B;
+  --text-secondary:          #4D4732;
+  --text-muted:              #7E775F;
+  --text-inverse:            #FFFFFF;
+
+  /* Borders */
+  --border-subtle:           #D0C6AB;
+  --border-strong:           #7E775F;
+
+  /* Semantic */
+  --success-bg:              #79F5FF;
+  --success-text:            #002022;
+  --warning-bg:              #FFE16D;
+  --warning-text:            #221B00;
+  --error-bg:                #FFDAD6;
+  --error-text:              #93000A;
+  --error-strong:            #BA1A1A;
+  --info-bg:                 #D2E2EC;
+  --info-text:               #0E1D25;
+
+  /* Legacy compat */
+  --background: var(--surface);
+  --foreground: var(--text-base);
+
+  --font-manrope: 'Manrope', sans-serif;
 }
 
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+  --font-sans: var(--font-manrope);
 }
 
 * {
@@ -17,32 +56,38 @@
 }
 
 body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: var(--font-geist-sans), Arial, sans-serif;
+  background: var(--surface);
+  color: var(--text-base);
+  font-family: var(--font-manrope), Arial, sans-serif;
+  -webkit-font-smoothing: antialiased;
 }
 
-/* Custom scrollbar */
-::-webkit-scrollbar {
-  width: 6px;
-  height: 6px;
-}
-::-webkit-scrollbar-track {
-  background: #f1f5f9;
-}
-::-webkit-scrollbar-thumb {
-  background: #cbd5e1;
-  border-radius: 3px;
-}
-::-webkit-scrollbar-thumb:hover {
-  background: #94a3b8;
-}
+/* ─── Scrollbar ─── */
+::-webkit-scrollbar { width: 5px; height: 5px; }
+::-webkit-scrollbar-track { background: var(--surface-low); }
+::-webkit-scrollbar-thumb { background: var(--border-subtle); border-radius: 3px; }
+::-webkit-scrollbar-thumb:hover { background: var(--border-strong); }
 
-/* Toast animation */
+/* ─── Toast animation ─── */
 @keyframes slide-in-from-right {
   from { transform: translateX(110%); opacity: 0; }
   to   { transform: translateX(0);    opacity: 1; }
 }
 .animate-in.slide-in-from-right {
-  animation: slide-in-from-right 0.3s ease-out;
+  animation: slide-in-from-right 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+/* ─── Skeleton shimmer ─── */
+@keyframes shimmer {
+  0%   { background-position: -400px 0; }
+  100% { background-position: 400px 0; }
+}
+.skeleton {
+  background: linear-gradient(90deg, var(--surface-high) 25%, var(--surface-highest) 50%, var(--surface-high) 75%);
+  background-size: 800px 100%;
+  animation: shimmer 1.4s ease-in-out infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .animate-in, .skeleton { animation: none; }
 }

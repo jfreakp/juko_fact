@@ -82,22 +82,35 @@ export default function InvoiceDetailPage({
     }
   }
 
-  if (loading) return <div className="p-8 text-center text-gray-400">Cargando...</div>;
-  if (!invoice) return <div className="p-8 text-center text-red-500">Factura no encontrada</div>;
+  if (loading) {
+    return (
+      <div style={{ background: "var(--surface)" }} className="min-h-screen p-8">
+        <div className="space-y-4">
+          {[1, 2, 3].map((i) => <div key={i} className="skeleton h-24 rounded-xl" />)}
+        </div>
+      </div>
+    );
+  }
+
+  if (!invoice) {
+    return (
+      <div style={{ background: "var(--surface)" }} className="min-h-screen p-8">
+        <p className="text-sm font-bold" style={{ color: "var(--error-text)" }}>Factura no encontrada</p>
+      </div>
+    );
+  }
 
   const serie = `${invoice.company.estab}-${invoice.company.ptoEmi}-${invoice.secuencial}`;
 
   return (
-    <div>
+    <div style={{ background: "var(--surface)" }} className="min-h-screen p-8">
       <Header
         title={`Factura ${serie}`}
         subtitle={`Comprobante electrónico — ${invoice.ambiente}`}
         action={
-          <div className="flex gap-3">
+          <div className="flex gap-2">
             {(invoice.estado === "PENDIENTE" || invoice.estado === "RECHAZADO") && (
-              <Button onClick={sendToSRI} loading={processing}>
-                Enviar al SRI
-              </Button>
+              <Button onClick={sendToSRI} loading={processing}>Enviar al SRI</Button>
             )}
             {invoice.estado === "AUTORIZADO" && (
               <a href={`/api/invoices/${id}/pdf`} target="_blank" rel="noreferrer">
@@ -110,48 +123,66 @@ export default function InvoiceDetailPage({
       />
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Main info */}
-        <div className="lg:col-span-2 space-y-6">
-          {/* Header card */}
-          <div className="bg-white rounded-xl shadow-sm border p-6">
-            <div className="flex items-start justify-between mb-4">
+        {/* Main */}
+        <div className="lg:col-span-2 space-y-4">
+          {/* Info card */}
+          <div className="rounded-xl p-6" style={{ background: "var(--surface-white)" }}>
+            <div className="flex items-start justify-between mb-5">
               <div>
-                <p className="text-sm text-gray-500">Estado</p>
+                <p className="text-[9px] font-bold tracking-[0.15em] uppercase mb-1" style={{ color: "var(--text-muted)" }}>Estado</p>
                 <Badge estado={invoice.estado}>{invoice.estado}</Badge>
               </div>
               <div className="text-right">
-                <p className="text-sm text-gray-500">Fecha Emisión</p>
-                <p className="font-medium">{new Date(invoice.fechaEmision).toLocaleDateString("es-EC")}</p>
+                <p className="text-[9px] font-bold tracking-[0.15em] uppercase mb-1" style={{ color: "var(--text-muted)" }}>Fecha Emisión</p>
+                <p className="text-sm font-bold" style={{ color: "var(--text-base)" }}>
+                  {new Date(invoice.fechaEmision).toLocaleDateString("es-EC")}
+                </p>
               </div>
             </div>
 
-            <div className="grid grid-cols-2 gap-4 text-sm">
+            <div className="grid grid-cols-2 gap-6">
               <div>
-                <p className="text-gray-500">Empresa Emisora</p>
-                <p className="font-medium">{invoice.company.razonSocial}</p>
-                <p className="text-gray-400">RUC: {invoice.company.ruc}</p>
+                <p className="text-[9px] font-bold tracking-[0.15em] uppercase mb-1" style={{ color: "var(--text-muted)" }}>Empresa Emisora</p>
+                <p className="text-sm font-bold" style={{ color: "var(--text-base)" }}>{invoice.company.razonSocial}</p>
+                <p className="text-[11px] font-medium" style={{ color: "var(--text-muted)" }}>RUC: {invoice.company.ruc}</p>
               </div>
               <div>
-                <p className="text-gray-500">Cliente</p>
-                <p className="font-medium">{invoice.client.razonSocial}</p>
-                <p className="text-gray-400">{invoice.client.identificacion}</p>
-                {invoice.client.email && <p className="text-gray-400">{invoice.client.email}</p>}
+                <p className="text-[9px] font-bold tracking-[0.15em] uppercase mb-1" style={{ color: "var(--text-muted)" }}>Cliente</p>
+                <p className="text-sm font-bold" style={{ color: "var(--text-base)" }}>{invoice.client.razonSocial}</p>
+                <p className="text-[11px] font-medium" style={{ color: "var(--text-muted)" }}>{invoice.client.identificacion}</p>
+                {invoice.client.email && (
+                  <p className="text-[11px] font-medium" style={{ color: "var(--text-muted)" }}>{invoice.client.email}</p>
+                )}
               </div>
             </div>
 
             {invoice.claveAcceso && (
-              <div className="mt-4 p-3 bg-gray-50 rounded-lg">
-                <p className="text-xs text-gray-500 mb-1">Clave de Acceso</p>
-                <p className="font-mono text-xs break-all">{invoice.claveAcceso}</p>
+              <div
+                className="mt-5 p-3 rounded-lg"
+                style={{ background: "var(--surface-low)" }}
+              >
+                <p className="text-[9px] font-bold tracking-[0.15em] uppercase mb-1" style={{ color: "var(--text-muted)" }}>
+                  Clave de Acceso
+                </p>
+                <p className="font-mono text-[11px] break-all" style={{ color: "var(--text-secondary)" }}>
+                  {invoice.claveAcceso}
+                </p>
               </div>
             )}
 
             {invoice.numeroAutorizacion && (
-              <div className="mt-3 p-3 bg-green-50 rounded-lg border border-green-200">
-                <p className="text-xs text-green-600 font-medium mb-1">Número de Autorización</p>
-                <p className="font-mono text-xs break-all text-green-800">{invoice.numeroAutorizacion}</p>
+              <div
+                className="mt-3 p-3 rounded-lg"
+                style={{ background: "var(--success-bg)", border: "1px solid var(--success-text)" }}
+              >
+                <p className="text-[9px] font-bold tracking-[0.15em] uppercase mb-1" style={{ color: "var(--success-text)", opacity: 0.7 }}>
+                  Número de Autorización
+                </p>
+                <p className="font-mono text-[11px] break-all font-bold" style={{ color: "var(--success-text)" }}>
+                  {invoice.numeroAutorizacion}
+                </p>
                 {invoice.fechaAutorizacion && (
-                  <p className="text-xs text-green-600 mt-1">
+                  <p className="text-[10px] mt-1" style={{ color: "var(--success-text)", opacity: 0.7 }}>
                     {new Date(invoice.fechaAutorizacion).toLocaleString("es-EC")}
                   </p>
                 )}
@@ -159,52 +190,78 @@ export default function InvoiceDetailPage({
             )}
           </div>
 
-          {/* Details */}
-          <div className="bg-white rounded-xl shadow-sm border overflow-hidden">
-            <div className="px-6 py-4 border-b">
-              <h3 className="font-semibold text-gray-900">Detalles</h3>
+          {/* Details table */}
+          <div className="rounded-xl overflow-hidden" style={{ background: "var(--surface-white)" }}>
+            <div
+              className="px-6 py-4"
+              style={{ borderBottom: "1px solid var(--surface-highest)" }}
+            >
+              <p className="text-[10px] font-bold tracking-[0.15em] uppercase" style={{ color: "var(--text-muted)" }}>
+                Detalles
+              </p>
             </div>
-            <table className="w-full text-sm">
+            <table className="w-full">
               <thead>
-                <tr className="bg-gray-50 text-xs font-medium text-gray-500 uppercase">
-                  <th className="px-4 py-3 text-left">Código</th>
-                  <th className="px-4 py-3 text-left">Descripción</th>
-                  <th className="px-4 py-3 text-right">Cant.</th>
-                  <th className="px-4 py-3 text-right">P. Unit.</th>
-                  <th className="px-4 py-3 text-right">Subtotal</th>
-                  <th className="px-4 py-3 text-right">IVA</th>
+                <tr style={{ background: "var(--surface-low)" }}>
+                  {["Código", "Descripción", "Cant.", "P. Unit.", "Subtotal", "IVA"].map((h) => (
+                    <th
+                      key={h}
+                      className={`px-4 py-3 text-[9px] font-bold tracking-[0.15em] uppercase
+                        ${["Cant.", "P. Unit.", "Subtotal", "IVA"].includes(h) ? "text-right" : "text-left"}`}
+                      style={{ color: "var(--text-muted)" }}
+                    >
+                      {h}
+                    </th>
+                  ))}
                 </tr>
               </thead>
-              <tbody className="divide-y">
-                {invoice.details.map((d) => (
-                  <tr key={d.id}>
-                    <td className="px-4 py-3 font-mono text-xs">{d.codigoPrincipal}</td>
-                    <td className="px-4 py-3">{d.descripcion}</td>
-                    <td className="px-4 py-3 text-right">{Number(d.cantidad).toFixed(2)}</td>
-                    <td className="px-4 py-3 text-right">${Number(d.precioUnitario).toFixed(2)}</td>
-                    <td className="px-4 py-3 text-right">${Number(d.precioTotalSinImpuesto).toFixed(2)}</td>
-                    <td className="px-4 py-3 text-right">${Number(d.valorIva).toFixed(2)}</td>
+              <tbody>
+                {invoice.details.map((d, idx) => (
+                  <tr key={d.id} style={{ background: idx % 2 === 0 ? "var(--surface-white)" : "var(--surface)" }}>
+                    <td className="px-4 py-3 font-mono text-[11px] font-semibold" style={{ color: "var(--text-base)" }}>
+                      {d.codigoPrincipal}
+                    </td>
+                    <td className="px-4 py-3 text-sm" style={{ color: "var(--text-base)" }}>{d.descripcion}</td>
+                    <td className="px-4 py-3 text-sm text-right" style={{ color: "var(--text-base)" }}>{Number(d.cantidad).toFixed(2)}</td>
+                    <td className="px-4 py-3 text-sm text-right" style={{ color: "var(--text-base)" }}>${Number(d.precioUnitario).toFixed(2)}</td>
+                    <td className="px-4 py-3 text-sm font-bold text-right" style={{ color: "var(--text-base)" }}>${Number(d.precioTotalSinImpuesto).toFixed(2)}</td>
+                    <td className="px-4 py-3 text-sm text-right" style={{ color: "var(--text-base)" }}>${Number(d.valorIva).toFixed(2)}</td>
                   </tr>
                 ))}
               </tbody>
             </table>
           </div>
 
-          {/* SRI Responses */}
+          {/* SRI history */}
           {invoice.sriResponses.length > 0 && (
-            <div className="bg-white rounded-xl shadow-sm border overflow-hidden">
-              <div className="px-6 py-4 border-b">
-                <h3 className="font-semibold text-gray-900">Historial SRI</h3>
+            <div className="rounded-xl overflow-hidden" style={{ background: "var(--surface-white)" }}>
+              <div className="px-6 py-4" style={{ borderBottom: "1px solid var(--surface-highest)" }}>
+                <p className="text-[10px] font-bold tracking-[0.15em] uppercase" style={{ color: "var(--text-muted)" }}>
+                  Historial SRI
+                </p>
               </div>
-              <div className="divide-y">
-                {invoice.sriResponses.map((r) => (
-                  <div key={r.id} className="px-6 py-3 flex items-center gap-4">
-                    <span className="text-xs font-medium text-gray-500 w-24">{r.tipo}</span>
+              <div>
+                {invoice.sriResponses.map((r, idx) => (
+                  <div
+                    key={r.id}
+                    className="px-6 py-3 flex items-center gap-4"
+                    style={{
+                      background: idx % 2 === 0 ? "var(--surface-white)" : "var(--surface)",
+                    }}
+                  >
+                    <span
+                      className="text-[9px] font-bold tracking-widest uppercase w-24"
+                      style={{ color: "var(--text-muted)" }}
+                    >
+                      {r.tipo}
+                    </span>
                     <Badge estado={r.estado === "RECIBIDA" || r.estado === "AUTORIZADA" ? "AUTORIZADO" : r.estado}>
                       {r.estado}
                     </Badge>
-                    {r.mensaje && <span className="text-xs text-gray-600">{r.mensaje}</span>}
-                    <span className="text-xs text-gray-400 ml-auto">
+                    {r.mensaje && (
+                      <span className="text-[11px] flex-1" style={{ color: "var(--text-secondary)" }}>{r.mensaje}</span>
+                    )}
+                    <span className="text-[10px] ml-auto" style={{ color: "var(--text-muted)" }}>
                       {new Date(r.createdAt).toLocaleString("es-EC")}
                     </span>
                   </div>
@@ -216,53 +273,66 @@ export default function InvoiceDetailPage({
 
         {/* Sidebar: totals */}
         <div className="space-y-4">
-          <div className="bg-white rounded-xl shadow-sm border p-6">
-            <h3 className="font-semibold text-gray-900 mb-4">Totales</h3>
-            <div className="space-y-2 text-sm">
-              <div className="flex justify-between">
-                <span className="text-gray-500">Subtotal 0%</span>
-                <span>${Number(invoice.subtotal0).toFixed(2)}</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-gray-500">Subtotal 12%</span>
-                <span>${Number(invoice.subtotal12).toFixed(2)}</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-gray-500">Descuento</span>
-                <span>-${Number(invoice.totalDescuento).toFixed(2)}</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-gray-500">IVA</span>
-                <span>${Number(invoice.totalIva).toFixed(2)}</span>
-              </div>
-              <div className="border-t pt-2 flex justify-between font-bold text-base">
-                <span>TOTAL</span>
-                <span className="text-blue-600">${Number(invoice.importeTotal).toFixed(2)}</span>
+          <div className="rounded-xl p-6" style={{ background: "var(--surface-white)" }}>
+            <p className="text-[10px] font-bold tracking-[0.15em] uppercase mb-4" style={{ color: "var(--text-muted)" }}>
+              Totales
+            </p>
+            <div className="space-y-3 text-sm">
+              {[
+                { label: "Subtotal 0%", value: `$${Number(invoice.subtotal0).toFixed(2)}` },
+                { label: "Subtotal 12%", value: `$${Number(invoice.subtotal12).toFixed(2)}` },
+                { label: "Descuento", value: `-$${Number(invoice.totalDescuento).toFixed(2)}` },
+                { label: "IVA", value: `$${Number(invoice.totalIva).toFixed(2)}` },
+              ].map((row) => (
+                <div key={row.label} className="flex justify-between">
+                  <span style={{ color: "var(--text-muted)" }}>{row.label}</span>
+                  <span className="font-semibold" style={{ color: "var(--text-base)" }}>{row.value}</span>
+                </div>
+              ))}
+              <div
+                className="flex justify-between pt-3 mt-1"
+                style={{ borderTop: "2px solid var(--surface-highest)" }}
+              >
+                <span className="font-black text-sm tracking-widest uppercase" style={{ color: "var(--text-base)" }}>
+                  Total
+                </span>
+                <span className="font-black text-lg" style={{ color: "var(--primary-focus)" }}>
+                  ${Number(invoice.importeTotal).toFixed(2)}
+                </span>
               </div>
             </div>
           </div>
 
-          {/* XML download links */}
           {(invoice.xmlFirmado || invoice.xmlAutorizado) && (
-            <div className="bg-white rounded-xl shadow-sm border p-6">
-              <h3 className="font-semibold text-gray-900 mb-3">Archivos XML</h3>
+            <div className="rounded-xl p-6" style={{ background: "var(--surface-white)" }}>
+              <p className="text-[10px] font-bold tracking-[0.15em] uppercase mb-4" style={{ color: "var(--text-muted)" }}>
+                Archivos XML
+              </p>
               <div className="space-y-2">
                 {invoice.xmlFirmado && (
                   <a
                     href={`data:text/xml;charset=utf-8,${encodeURIComponent(invoice.xmlFirmado)}`}
                     download={`factura-firmada-${invoice.secuencial}.xml`}
-                    className="flex items-center gap-2 text-sm text-blue-600 hover:underline"
+                    className="flex items-center gap-2 text-sm font-bold transition-colors"
+                    style={{ color: "var(--primary-focus)" }}
                   >
-                    📄 XML Firmado
+                    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                    </svg>
+                    XML Firmado
                   </a>
                 )}
                 {invoice.xmlAutorizado && (
                   <a
                     href={`data:text/xml;charset=utf-8,${encodeURIComponent(invoice.xmlAutorizado)}`}
                     download={`factura-autorizada-${invoice.secuencial}.xml`}
-                    className="flex items-center gap-2 text-sm text-green-600 hover:underline"
+                    className="flex items-center gap-2 text-sm font-bold transition-colors"
+                    style={{ color: "var(--success-text)" }}
                   >
-                    ✅ XML Autorizado
+                    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    </svg>
+                    XML Autorizado
                   </a>
                 )}
               </div>

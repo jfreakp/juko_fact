@@ -66,9 +66,7 @@ export default function ProductsPage() {
     setLoading(false);
   }
 
-  useEffect(() => {
-    loadProducts();
-  }, [search]);
+  useEffect(() => { loadProducts(); }, [search]);
 
   function openCreate() {
     setEditProduct(null);
@@ -92,18 +90,15 @@ export default function ProductsPage() {
   async function handleSubmit(e: FormEvent) {
     e.preventDefault();
     setSaving(true);
-
     try {
       const url = editProduct ? `/api/products/${editProduct.id}` : "/api/products";
       const method = editProduct ? "PUT" : "POST";
-
       const res = await fetch(url, {
         method,
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ ...form, precio: parseFloat(form.precio) }),
       });
       const data = await res.json();
-
       if (!data.success) throw new Error(data.error);
       success(editProduct ? "Producto actualizado" : "Producto creado exitosamente");
       setModalOpen(false);
@@ -128,61 +123,87 @@ export default function ProductsPage() {
   }
 
   return (
-    <div>
+    <div style={{ background: "var(--surface)" }} className="min-h-screen p-8">
       <Header
         title="Productos"
         subtitle="Catálogo de productos y servicios"
         action={<Button onClick={openCreate}>+ Nuevo Producto</Button>}
       />
 
-      <div className="mb-4">
+      <div className="mb-6 max-w-sm">
         <Input
           placeholder="Buscar por código o descripción..."
           value={search}
           onChange={(e) => setSearch(e.target.value)}
-          className="max-w-md"
         />
       </div>
 
-      <div className="bg-white rounded-xl shadow-sm border overflow-hidden">
+      <div className="rounded-xl overflow-hidden" style={{ background: "var(--surface-white)" }}>
         {loading ? (
-          <div className="p-8 text-center text-gray-400">Cargando...</div>
+          <div className="p-8 space-y-3">
+            {[1, 2, 3, 4].map((i) => <div key={i} className="skeleton h-12 rounded-lg" />)}
+          </div>
         ) : products.length === 0 ? (
-          <div className="p-8 text-center">
-            <p className="text-gray-400 mb-3">No hay productos registrados</p>
+          <div className="p-16 text-center">
+            <div
+              className="w-12 h-12 rounded-xl mx-auto mb-4 flex items-center justify-center"
+              style={{ background: "var(--surface-low)" }}
+            >
+              <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}
+                style={{ color: "var(--text-muted)" }}>
+                <path strokeLinecap="round" strokeLinejoin="round"
+                  d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" />
+              </svg>
+            </div>
+            <p className="text-sm font-bold mb-1" style={{ color: "var(--text-base)" }}>Sin productos</p>
+            <p className="text-[11px] font-medium mb-5" style={{ color: "var(--text-muted)" }}>
+              Registre su catálogo de productos y servicios
+            </p>
             <Button size="sm" onClick={openCreate}>Agregar primer producto</Button>
           </div>
         ) : (
           <table className="w-full">
             <thead>
-              <tr className="bg-gray-50 text-xs font-medium text-gray-500 uppercase">
-                <th className="px-6 py-3 text-left">Código</th>
-                <th className="px-6 py-3 text-left">Descripción</th>
-                <th className="px-6 py-3 text-left">Tipo</th>
-                <th className="px-6 py-3 text-right">Precio</th>
-                <th className="px-6 py-3 text-center">IVA</th>
-                <th className="px-6 py-3 text-right">Acciones</th>
+              <tr style={{ background: "var(--surface-low)" }}>
+                {["Código", "Descripción", "Tipo", "Precio", "IVA", ""].map((h) => (
+                  <th
+                    key={h}
+                    className={`px-6 py-3 text-[9px] font-bold tracking-[0.15em] uppercase
+                      ${h === "Precio" || h === "" ? "text-right" : h === "IVA" ? "text-center" : "text-left"}`}
+                    style={{ color: "var(--text-muted)" }}
+                  >
+                    {h}
+                  </th>
+                ))}
               </tr>
             </thead>
-            <tbody className="divide-y divide-gray-100">
-              {products.map((p) => (
-                <tr key={p.id} className="hover:bg-gray-50">
-                  <td className="px-6 py-3 text-sm font-mono text-gray-900">{p.codigoPrincipal}</td>
-                  <td className="px-6 py-3 text-sm text-gray-900 font-medium">{p.descripcion}</td>
-                  <td className="px-6 py-3 text-sm">
-                    <Badge variant={p.tipo === "SERVICIO" ? "purple" : "info"}>
-                      {p.tipo}
-                    </Badge>
+            <tbody>
+              {products.map((p, idx) => (
+                <tr
+                  key={p.id}
+                  style={{ background: idx % 2 === 0 ? "var(--surface-white)" : "var(--surface)" }}
+                >
+                  <td className="px-6 py-3.5 font-mono text-sm font-semibold" style={{ color: "var(--text-base)" }}>
+                    {p.codigoPrincipal}
                   </td>
-                  <td className="px-6 py-3 text-sm font-medium text-right text-gray-900">
+                  <td className="px-6 py-3.5 text-sm font-bold" style={{ color: "var(--text-base)" }}>
+                    {p.descripcion}
+                  </td>
+                  <td className="px-6 py-3.5 text-sm">
+                    <Badge variant={p.tipo === "SERVICIO" ? "purple" : "info"}>{p.tipo}</Badge>
+                  </td>
+                  <td className="px-6 py-3.5 text-sm font-bold text-right" style={{ color: "var(--text-base)" }}>
                     ${Number(p.precio).toFixed(2)}
                   </td>
-                  <td className="px-6 py-3 text-sm text-center">
-                    <span className="px-2 py-1 bg-green-100 text-green-700 rounded text-xs font-medium">
+                  <td className="px-6 py-3.5 text-center">
+                    <span
+                      className="px-2 py-0.5 rounded text-[10px] font-bold tracking-widest uppercase"
+                      style={{ background: "var(--success-bg)", color: "var(--success-text)" }}
+                    >
                       {IVA_LABEL[p.tipoIva]}
                     </span>
                   </td>
-                  <td className="px-6 py-3 text-right">
+                  <td className="px-6 py-3.5 text-right">
                     <div className="flex justify-end gap-2">
                       <Button size="sm" variant="ghost" onClick={() => openEdit(p)}>Editar</Button>
                       <Button size="sm" variant="danger" onClick={() => handleDelete(p.id)}>Eliminar</Button>
@@ -248,7 +269,7 @@ export default function ProductsPage() {
             />
           </div>
           <div className="flex justify-end gap-3 pt-2">
-            <Button variant="secondary" type="button" onClick={() => setModalOpen(false)}>
+            <Button variant="ghost" type="button" onClick={() => setModalOpen(false)}>
               Cancelar
             </Button>
             <Button type="submit" loading={saving}>

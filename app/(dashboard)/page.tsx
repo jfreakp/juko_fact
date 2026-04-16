@@ -49,31 +49,31 @@ export default function DashboardPage() {
     {
       label: "Total Facturas",
       value: stats?.total ?? 0,
-      color: "bg-blue-500",
-      icon: "📄",
+      accent: "var(--primary)",
+      accentText: "var(--on-primary)",
     },
     {
       label: "Pendientes",
       value: stats?.pendientes ?? 0,
-      color: "bg-yellow-500",
-      icon: "⏳",
+      accent: "var(--surface-highest)",
+      accentText: "var(--text-secondary)",
     },
     {
       label: "Autorizadas",
       value: stats?.autorizadas ?? 0,
-      color: "bg-green-500",
-      icon: "✅",
+      accent: "var(--success-bg)",
+      accentText: "var(--success-text)",
     },
     {
       label: "Rechazadas",
       value: stats?.rechazadas ?? 0,
-      color: "bg-red-500",
-      icon: "❌",
+      accent: "var(--error-bg)",
+      accentText: "var(--error-text)",
     },
   ];
 
   return (
-    <div>
+    <div style={{ background: "var(--surface)" }} className="min-h-screen p-8">
       <Header
         title="Dashboard"
         subtitle="Resumen de facturación electrónica"
@@ -87,18 +87,33 @@ export default function DashboardPage() {
       {/* Stats */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
         {statCards.map((card) => (
-          <div key={card.label} className="bg-white rounded-xl shadow-sm border p-5">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-gray-500">{card.label}</p>
-                <p className="text-3xl font-bold text-gray-900 mt-1">
-                  {loading ? "—" : card.value}
-                </p>
-              </div>
-              <div
-                className={`w-12 h-12 ${card.color} rounded-xl flex items-center justify-center text-2xl`}
+          <div
+            key={card.label}
+            className="rounded-xl p-5"
+            style={{ background: "var(--surface-white)" }}
+          >
+            <p
+              className="text-[10px] font-bold tracking-widest uppercase mb-3"
+              style={{ color: "var(--text-muted)" }}
+            >
+              {card.label}
+            </p>
+            <div className="flex items-end justify-between">
+              <p
+                className="text-4xl font-black leading-none"
+                style={{ color: "var(--text-base)" }}
               >
-                {card.icon}
+                {loading ? (
+                  <span className="skeleton inline-block w-10 h-9 rounded" />
+                ) : (
+                  card.value
+                )}
+              </p>
+              <div
+                className="w-10 h-10 rounded-lg flex items-center justify-center text-lg font-black"
+                style={{ background: card.accent, color: card.accentText }}
+              >
+                {loading ? "" : card.value > 0 ? "↑" : "—"}
               </div>
             </div>
           </div>
@@ -106,19 +121,53 @@ export default function DashboardPage() {
       </div>
 
       {/* Recent invoices */}
-      <div className="bg-white rounded-xl shadow-sm border">
-        <div className="px-6 py-4 border-b flex items-center justify-between">
-          <h2 className="font-semibold text-gray-900">Últimas Facturas</h2>
-          <Link href="/invoices" className="text-sm text-blue-600 hover:underline">
+      <div
+        className="rounded-xl overflow-hidden"
+        style={{ background: "var(--surface-white)" }}
+      >
+        <div
+          className="px-6 py-4 flex items-center justify-between"
+          style={{ borderBottom: "1px solid var(--surface-highest)" }}
+        >
+          <div>
+            <h2 className="text-sm font-black tracking-tight" style={{ color: "var(--text-base)" }}>
+              Facturas Recientes
+            </h2>
+            <p className="text-[11px] font-medium mt-0.5" style={{ color: "var(--text-muted)" }}>
+              Últimas 5 transacciones procesadas
+            </p>
+          </div>
+          <Link
+            href="/invoices"
+            className="text-[11px] font-bold tracking-widest uppercase transition-colors"
+            style={{ color: "var(--primary-focus)" }}
+          >
             Ver todas →
           </Link>
         </div>
 
         {loading ? (
-          <div className="p-8 text-center text-gray-400">Cargando...</div>
+          <div className="p-8 space-y-3">
+            {[1, 2, 3].map((i) => (
+              <div key={i} className="skeleton h-12 rounded-lg" />
+            ))}
+          </div>
         ) : recent.length === 0 ? (
-          <div className="p-8 text-center">
-            <p className="text-gray-400 mb-4">No hay facturas aún</p>
+          <div className="p-16 text-center">
+            <div
+              className="w-12 h-12 rounded-xl mx-auto mb-4 flex items-center justify-center"
+              style={{ background: "var(--surface-low)" }}
+            >
+              <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}
+                style={{ color: "var(--text-muted)" }}>
+                <path strokeLinecap="round" strokeLinejoin="round"
+                  d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+              </svg>
+            </div>
+            <p className="text-sm font-bold mb-1" style={{ color: "var(--text-base)" }}>No hay facturas</p>
+            <p className="text-[11px] font-medium mb-5" style={{ color: "var(--text-muted)" }}>
+              Empiece creando su primera factura electrónica
+            </p>
             <Link href="/invoices/new">
               <Button size="sm">Crear primera factura</Button>
             </Link>
@@ -126,30 +175,40 @@ export default function DashboardPage() {
         ) : (
           <table className="w-full">
             <thead>
-              <tr className="text-left text-xs font-medium text-gray-500 uppercase tracking-wider bg-gray-50">
-                <th className="px-6 py-3">Número</th>
-                <th className="px-6 py-3">Cliente</th>
-                <th className="px-6 py-3">Fecha</th>
-                <th className="px-6 py-3 text-right">Total</th>
-                <th className="px-6 py-3">Estado</th>
+              <tr
+                className="text-left"
+                style={{ background: "var(--surface-low)" }}
+              >
+                {["Número", "Cliente", "Fecha", "Total", "Estado"].map((h, i) => (
+                  <th
+                    key={h}
+                    className={`px-6 py-3 text-[9px] font-bold tracking-[0.15em] uppercase ${i === 3 ? "text-right" : ""}`}
+                    style={{ color: "var(--text-muted)" }}
+                  >
+                    {h}
+                  </th>
+                ))}
               </tr>
             </thead>
-            <tbody className="divide-y divide-gray-100">
-              {recent.map((inv) => (
-                <tr key={inv.id} className="hover:bg-gray-50">
-                  <td className="px-6 py-3 font-mono text-sm text-gray-900">
-                    {inv.secuencial}
+            <tbody>
+              {recent.map((inv, idx) => (
+                <tr
+                  key={inv.id}
+                  style={{ background: idx % 2 === 0 ? "var(--surface-white)" : "var(--surface)" }}
+                >
+                  <td className="px-6 py-3.5 font-mono text-sm font-semibold" style={{ color: "var(--text-base)" }}>
+                    #{inv.secuencial}
                   </td>
-                  <td className="px-6 py-3 text-sm text-gray-700">
+                  <td className="px-6 py-3.5 text-sm font-medium" style={{ color: "var(--text-base)" }}>
                     {inv.client.razonSocial}
                   </td>
-                  <td className="px-6 py-3 text-sm text-gray-500">
+                  <td className="px-6 py-3.5 text-sm" style={{ color: "var(--text-muted)" }}>
                     {new Date(inv.fechaEmision).toLocaleDateString("es-EC")}
                   </td>
-                  <td className="px-6 py-3 text-sm font-medium text-right text-gray-900">
+                  <td className="px-6 py-3.5 text-sm font-bold text-right" style={{ color: "var(--text-base)" }}>
                     ${Number(inv.importeTotal).toFixed(2)}
                   </td>
-                  <td className="px-6 py-3">
+                  <td className="px-6 py-3.5">
                     <Badge estado={inv.estado}>{inv.estado}</Badge>
                   </td>
                 </tr>

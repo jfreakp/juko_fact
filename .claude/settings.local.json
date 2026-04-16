@@ -25,7 +25,8 @@
       "Bash(netstat -ano)",
       "Bash(findstr \":3000\")",
       "Bash(pnpm next:*)",
-      "Bash(grep -l \"already running\\\\|PID\\\\|dev-server\" node_modules/next/dist/server/dev/*.js)"
+      "Bash(grep -l \"already running\\\\|PID\\\\|dev-server\" node_modules/next/dist/server/dev/*.js)",
+      "Bash(grep -v \"^$\")"
     ]
   }
 }

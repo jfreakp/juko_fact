@@ -18,11 +18,11 @@ interface ToastContextValue {
 
 const ToastContext = createContext<ToastContextValue | null>(null);
 
-const toastColors: Record<ToastType, string> = {
-  success: "bg-green-600",
-  error: "bg-red-600",
-  info: "bg-blue-600",
-  warning: "bg-yellow-500",
+const toastStyles: Record<ToastType, { bg: string; color: string }> = {
+  success: { bg: "#002022", color: "#79F5FF" },
+  error:   { bg: "#93000A", color: "#FFDAD6" },
+  info:    { bg: "#0E1D25", color: "#D2E2EC" },
+  warning: { bg: "#221B00", color: "#FFD700" },
 };
 
 export function ToastProvider({ children }: { children: ReactNode }) {
@@ -46,13 +46,17 @@ export function ToastProvider({ children }: { children: ReactNode }) {
         {toasts.map((t) => (
           <div
             key={t.id}
-            className={`${toastColors[t.type]} text-white px-4 py-3 rounded-lg shadow-lg
-              flex items-center gap-3 animate-in slide-in-from-right`}
+            className="px-4 py-3 rounded-xl flex items-center gap-3 animate-in slide-in-from-right"
+            style={{
+              background: toastStyles[t.type].bg,
+              color: toastStyles[t.type].color,
+              border: "1px solid rgba(255,255,255,0.1)",
+            }}
           >
-            <span className="text-sm font-medium flex-1">{t.message}</span>
+            <span className="text-sm font-bold flex-1">{t.message}</span>
             <button
               onClick={() => setToasts((p) => p.filter((x) => x.id !== t.id))}
-              className="text-white/70 hover:text-white"
+              className="opacity-60 hover:opacity-100 transition-opacity text-lg leading-none"
             >
               ×
             </button>

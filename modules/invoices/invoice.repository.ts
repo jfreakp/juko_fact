@@ -173,7 +173,21 @@ export const invoiceRepository = {
       fechaAutorizacion?: Date;
     }
   ) {
+    // Uses update (not updateMany) since invoice id is globally unique (cuid).
+    // The companyId check is enforced at service layer via findById before calling this.
     return prisma.invoice.update({ where: { id }, data: data as never });
+  },
+
+  /** Returns invoices that need to be sent or re-sent to the SRI */
+  async findPendingSRI(companyId: string) {
+    return prisma.invoice.findMany({
+      where: {
+        companyId,
+        estado: { in: ["PENDIENTE", "DEVUELTA", "RECHAZADO"] as never[] },
+      },
+      include: { client: true },
+      orderBy: { createdAt: "asc" },
+    });
   },
 
   async addSRIResponse(

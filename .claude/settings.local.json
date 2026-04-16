@@ -1,7 +1,31 @@
 {
   "permissions": {
     "allow": [
-      "Skill(update-config)"
+      "Skill(update-config)",
+      "Bash(node -e \"const pkg = require\\('./node_modules/next/package.json'\\); console.log\\('Next.js:', pkg.version\\)\")",
+      "Bash(node -e \"const pkg = require\\('./node_modules/prisma/package.json'\\); console.log\\('Prisma:', pkg.version\\)\")",
+      "Bash(node -e \"const pkg = require\\('./node_modules/@prisma/client/package.json'\\); console.log\\('@prisma/client:', pkg.version\\)\")",
+      "Bash(node -e \"const client = require\\('./node_modules/@prisma/client'\\); console.log\\('Keys:', Object.keys\\(client\\).slice\\(0, 10\\)\\)\")",
+      "Bash(docker compose:*)",
+      "Bash(docker exec:*)",
+      "Bash(pnpm db:push)",
+      "Bash(node -e \"const p = require\\('./node_modules/prisma/package.json'\\); console.log\\(JSON.stringify\\(p.exports ? Object.keys\\(p.exports\\) : 'no exports', null, 2\\)\\)\")",
+      "Bash(node -e \"const c = require\\('./node_modules/prisma/config'\\); console.log\\(Object.keys\\(c\\)\\)\")",
+      "Bash(node -e \"const c = require\\('./node_modules/prisma/config'\\); const def = c.defineConfig; console.log\\(def.toString\\(\\).substring\\(0, 500\\)\\)\")",
+      "Bash(node -e ':*)",
+      "Bash(./node_modules/.bin/ts-node --compiler-options \"{\\\\\"module\\\\\":\\\\\"CommonJS\\\\\"}\" prisma/seed.ts)",
+      "Bash(pnpm dev:*)",
+      "Bash(taskkill:*)",
+      "Bash(cmd:*)",
+      "Bash(python3:*)",
+      "Bash(python:*)",
+      "Bash(pip install:*)",
+      "Bash(pnpm db:generate)",
+      "mcp__ide__getDiagnostics",
+      "Bash(netstat -ano)",
+      "Bash(findstr \":3000\")",
+      "Bash(pnpm next:*)",
+      "Bash(grep -l \"already running\\\\|PID\\\\|dev-server\" node_modules/next/dist/server/dev/*.js)"
     ]
   }
 }

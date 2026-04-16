@@ -41,6 +41,7 @@ enum TipoProducto {
 enum EstadoComprobante {
   PENDIENTE
   ENVIADO
+  DEVUELTA
   AUTORIZADO
   RECHAZADO
   ANULADO
@@ -83,6 +84,10 @@ model Company {
   ambiente         Ambiente    @default(PRUEBAS)
   tipoEmision      TipoEmision @default(NORMAL)
   logoUrl          String?
+  // Contador secuencial del codigoNumerico para generación de claveAcceso SRI.
+  // Se incrementa atómicamente con cada comprobante emitido.
+  codigoNumericoSiguiente Int         @default(1)
+
   active           Boolean     @default(true)
   createdAt        DateTime    @default(now())
   updatedAt        DateTime    @updatedAt
@@ -176,6 +181,9 @@ model Invoice {
   totalIva            Decimal           @default(0) @db.Decimal(12, 2)
   propina             Decimal           @default(0) @db.Decimal(12, 2)
   importeTotal        Decimal           @default(0) @db.Decimal(12, 2)
+
+  // Pago
+  formaPago           String            @default("01") // Tabla 24: 01=efectivo, 19=tarjeta crédito, etc.
 
   // SRI data
   estado              EstadoComprobante @default(PENDIENTE)

@@ -170,7 +170,7 @@ export default function NewInvoicePage() {
       if (!data.success) throw new Error(data.error);
 
       success("Factura creada exitosamente");
-      router.push("/dashboard/invoices");
+      router.push("/invoices");
     } catch (err) {
       toastError(err instanceof Error ? err.message : "Error al crear factura");
     } finally {

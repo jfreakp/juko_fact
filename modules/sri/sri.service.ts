@@ -1,30 +1,39 @@
 import axios from "axios";
+import https from "https";
 import { generateAccessKey } from "./access-key.generator";
 import { buildInvoiceXML } from "./xml.generator";
 import { signXML } from "./xml.signer";
 import { invoiceRepository } from "@/modules/invoices/invoice.repository";
 import { companyRepository } from "@/modules/company/company.repository";
-import type {
-  InvoiceForXML,
-  SRIReceptionResponse,
-  SRIAuthorizationResponse,
-} from "@/types";
+import type { InvoiceForXML } from "@/types";
 
-// ─── SRI Endpoint URLs ───────────────────────────────────────────────────────
-const SRI_ENDPOINTS = {
-  PRUEBAS: {
-    recepcion:
-      "https://celcer.sri.gob.ec/comprobantes-electronicos-ws/RecepcionComprobantesOffline?wsdl",
-    autorizacion:
-      "https://celcer.sri.gob.ec/comprobantes-electronicos-ws/AutorizacionComprobantesOffline?wsdl",
-  },
-  PRODUCCION: {
-    recepcion:
-      "https://cel.sri.gob.ec/comprobantes-electronicos-ws/RecepcionComprobantesOffline?wsdl",
-    autorizacion:
-      "https://cel.sri.gob.ec/comprobantes-electronicos-ws/AutorizacionComprobantesOffline?wsdl",
-  },
-};
+// In development, SRI's test environment uses self-signed or untrusted certs
+const httpsAgent =
+  process.env.NODE_ENV !== "production"
+    ? new https.Agent({ rejectUnauthorized: false })
+    : undefined;
+
+// ─── SRI Endpoint URLs (from .env) ───────────────────────────────────────────
+function getSRIEndpoints() {
+  return {
+    PRUEBAS: {
+      recepcion:
+        process.env.SRI_WS_RECEPCION_PRUEBAS ??
+        "https://celcer.sri.gob.ec/comprobantes-electronicos-ws/RecepcionComprobantesOffline",
+      autorizacion:
+        process.env.SRI_WS_AUTORIZACION_PRUEBAS ??
+        "https://celcer.sri.gob.ec/comprobantes-electronicos-ws/AutorizacionComprobantesOffline",
+    },
+    PRODUCCION: {
+      recepcion:
+        process.env.SRI_WS_RECEPCION_PRODUCCION ??
+        "https://cel.sri.gob.ec/comprobantes-electronicos-ws/RecepcionComprobantesOffline",
+      autorizacion:
+        process.env.SRI_WS_AUTORIZACION_PRODUCCION ??
+        "https://cel.sri.gob.ec/comprobantes-electronicos-ws/AutorizacionComprobantesOffline",
+    },
+  };
+}
 
 const USE_MOCK = process.env.SRI_USE_MOCK !== "false";
 
@@ -50,15 +59,27 @@ export const sriService = {
       throw new Error("No hay certificado digital activo. Configure su certificado .p12");
     }
 
-    // ── Step 1: Generate access key ────────────────────────────────────────
-    const claveAcceso = generateAccessKey({
-      fechaEmision: invoice.fechaEmision,
-      ruc: invoice.company.ruc,
-      ambiente: invoice.company.ambiente,
-      estab: invoice.company.estab,
-      ptoEmi: invoice.company.ptoEmi,
-      secuencial: invoice.secuencial,
-    });
+    // ── Step 1: Generate or reuse access key ─────────────────────────────
+    // Per SRI spec: DEVUELTA/RECHAZADO must reuse the same claveAcceso.
+    // For new invoices: use the company's sequential codigoNumerico (atomic increment).
+    let claveAcceso: string;
+    if (
+      (invoice.estado === "DEVUELTA" || invoice.estado === "RECHAZADO") &&
+      invoice.claveAcceso
+    ) {
+      claveAcceso = invoice.claveAcceso;
+    } else {
+      const codigoNumerico = await companyRepository.getNextCodigoNumerico(companyId);
+      claveAcceso = generateAccessKey({
+        fechaEmision: invoice.fechaEmision,
+        ruc: invoice.company.ruc,
+        ambiente: invoice.company.ambiente,
+        estab: invoice.company.estab,
+        ptoEmi: invoice.company.ptoEmi,
+        secuencial: invoice.secuencial,
+        codigoNumerico,
+      });
+    }
 
     await invoiceRepository.updateSRI(invoiceId, { claveAcceso });
     invoice.claveAcceso = claveAcceso;
@@ -96,6 +117,8 @@ export const sriService = {
     );
 
     if (receptionResult.estado !== "RECIBIDA") {
+      // Mark as DEVUELTA so it can be queried and retried later
+      await invoiceRepository.updateSRI(invoiceId, { estado: "DEVUELTA" });
       return {
         success: false,
         estado: "DEVUELTA",
@@ -135,10 +158,11 @@ export const sriService = {
       const xmlBase64 = Buffer.from(xmlFirmado).toString("base64");
       const soapEnvelope = buildReceptionSOAP(xmlBase64);
 
-      const url = SRI_ENDPOINTS[ambiente].recepcion.replace("?wsdl", "");
+      const url = getSRIEndpoints()[ambiente].recepcion;
       const response = await axios.post(url, soapEnvelope, {
         headers: { "Content-Type": "text/xml; charset=UTF-8" },
         timeout: 30000,
+        httpsAgent,
       });
 
       const parsed = parseReceptionResponse(response.data);
@@ -151,11 +175,20 @@ export const sriService = {
 
       return parsed;
     } catch (err) {
-      const message = err instanceof Error ? err.message : "Error de conexión con SRI";
+      let message = err instanceof Error ? err.message : "Error de conexión con SRI";
+      let rawResponse: string | undefined;
+      if (axios.isAxiosError(err) && err.response?.data) {
+        rawResponse = String(err.response.data);
+        // Try to extract SOAP fault detail from the response
+        const faultMatch = rawResponse.match(/<faultstring[^>]*>([^<]+)<\/faultstring>/);
+        if (faultMatch) message = `SOAP Fault: ${faultMatch[1]}`;
+        else message = `HTTP ${err.response.status}: ${rawResponse.slice(0, 300)}`;
+      }
       await invoiceRepository.addSRIResponse(invoiceId, {
         tipo: "RECEPCION",
         estado: "ERROR",
         mensaje: message,
+        rawResponse,
       });
       throw new Error(`Error enviando al SRI: ${message}`);
     }
@@ -177,11 +210,12 @@ export const sriService = {
 
     try {
       const soapEnvelope = buildAuthorizationSOAP(claveAcceso);
-      const url = SRI_ENDPOINTS[ambiente].autorizacion.replace("?wsdl", "");
+      const url = getSRIEndpoints()[ambiente].autorizacion;
 
       const response = await axios.post(url, soapEnvelope, {
         headers: { "Content-Type": "text/xml; charset=UTF-8" },
         timeout: 30000,
+        httpsAgent,
       });
 
       const parsed = parseAuthorizationResponse(response.data);
@@ -205,11 +239,19 @@ export const sriService = {
 
       return parsed;
     } catch (err) {
-      const message = err instanceof Error ? err.message : "Error de autorización";
+      let message = err instanceof Error ? err.message : "Error de autorización";
+      let rawResponse: string | undefined;
+      if (axios.isAxiosError(err) && err.response?.data) {
+        rawResponse = String(err.response.data);
+        const faultMatch = rawResponse.match(/<faultstring[^>]*>([^<]+)<\/faultstring>/);
+        if (faultMatch) message = `SOAP Fault: ${faultMatch[1]}`;
+        else message = `HTTP ${err.response.status}: ${rawResponse.slice(0, 300)}`;
+      }
       await invoiceRepository.addSRIResponse(invoiceId, {
         tipo: "AUTORIZACION",
         estado: "ERROR",
         mensaje: message,
+        rawResponse,
       });
       throw new Error(`Error autorizando comprobante: ${message}`);
     }
@@ -244,12 +286,25 @@ function buildAuthorizationSOAP(claveAcceso: string): string {
 
 // ─── Response Parsers ─────────────────────────────────────────────────────────
 
-function parseReceptionResponse(xml: string): { estado: string; mensaje?: string } {
+function parseReceptionResponse(xml: string): { estado: string; mensaje?: string; informacion?: string } {
   const stateMatch = xml.match(/<estado>([^<]+)<\/estado>/);
-  const msgMatch = xml.match(/<mensaje>([^<]+)<\/mensaje>/);
+  // Collect all error messages (identificador + mensaje + informacionAdicional)
+  const errores: string[] = [];
+  const msgRegex = /<mensaje[^>]*>([\s\S]*?)<\/mensaje>/g;
+  let m;
+  while ((m = msgRegex.exec(xml)) !== null) {
+    const block = m[1];
+    const id = block.match(/<identificador>([^<]+)<\/identificador>/)?.[1];
+    const msg = block.match(/<mensaje>([^<]+)<\/mensaje>/)?.[1];
+    const info = block.match(/<informacionAdicional>([^<]+)<\/informacionAdicional>/)?.[1];
+    const tipo = block.match(/<tipo>([^<]+)<\/tipo>/)?.[1];
+    if (msg) errores.push(`[${id ?? "?"}][${tipo ?? "?"}] ${msg}${info ? ` (${info})` : ""}`);
+  }
+  // Fallback: simple mensaje tag
+  const simpleMsgMatch = errores.length === 0 ? xml.match(/<mensaje>([^<]+)<\/mensaje>/) : null;
   return {
     estado: stateMatch?.[1] ?? "ERROR",
-    mensaje: msgMatch?.[1],
+    mensaje: errores.length > 0 ? errores.join(" | ") : simpleMsgMatch?.[1],
   };
 }
 

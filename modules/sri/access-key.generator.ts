@@ -1,5 +1,3 @@
-import { v4 as uuidv4 } from "uuid";
-
 /**
  * Generates a 49-digit SRI access key (clave de acceso).
  *
@@ -11,7 +9,7 @@ import { v4 as uuidv4 } from "uuid";
  *  [25-27]  estab           3 digits
  *  [28-30]  ptoEmi          3 digits
  *  [31-39]  secuencial      9 digits
- *  [40-47]  codigoNumerico  8 random digits
+ *  [40-47]  codigoNumerico  8 digits — sequential counter stored per company
  *  [48]     tipoEmision     1=NORMAL
  *  [49]     digitoVerificador module-11
  */
@@ -24,6 +22,8 @@ export function generateAccessKey(params: {
   ptoEmi: string;
   secuencial: string;
   tipoEmision?: string;
+  /** 8-digit sequential code from the company counter (companyRepository.getNextCodigoNumerico) */
+  codigoNumerico: string;
 }): string {
   const {
     fechaEmision,
@@ -34,6 +34,7 @@ export function generateAccessKey(params: {
     ptoEmi,
     secuencial,
     tipoEmision = "1",
+    codigoNumerico,
   } = params;
 
   const day = fechaEmision.getDate().toString().padStart(2, "0");
@@ -45,13 +46,6 @@ export function generateAccessKey(params: {
   const establ = estab.padStart(3, "0");
   const pto = ptoEmi.padStart(3, "0");
   const seq = secuencial.padStart(9, "0");
-
-  // 8 random digits from UUID
-  const codigoNumerico = uuidv4()
-    .replace(/-/g, "")
-    .replace(/[a-f]/gi, "")
-    .substring(0, 8)
-    .padEnd(8, "0");
 
   const base =
     fecha +

@@ -68,4 +68,19 @@ export const companyRepository = {
       where: { companyId, active: true },
     });
   },
+
+  /**
+   * Atomically increments and returns the next codigoNumerico for a company.
+   * This 8-digit sequential number is part of the SRI claveAcceso (positions 40-47).
+   * Using Prisma's atomic increment prevents collisions under concurrent requests.
+   */
+  async getNextCodigoNumerico(companyId: string): Promise<string> {
+    const updated = await prisma.company.update({
+      where: { id: companyId },
+      data: { codigoNumericoSiguiente: { increment: 1 } },
+      select: { codigoNumericoSiguiente: true },
+    });
+    // Return the value BEFORE increment (subtract 1), zero-padded to 8 digits
+    return (updated.codigoNumericoSiguiente - 1).toString().padStart(8, "0");
+  },
 };

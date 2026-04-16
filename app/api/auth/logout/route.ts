@@ -1,14 +1,8 @@
-import { clearAuthCookieHeader } from "@/lib/auth";
+import { cookies } from "next/headers";
+import { apiSuccess } from "@/lib/api";
 
 export async function POST() {
-  return new Response(
-    JSON.stringify({ success: true, data: null }),
-    {
-      status: 200,
-      headers: {
-        "Content-Type": "application/json",
-        "Set-Cookie": clearAuthCookieHeader(),
-      },
-    }
-  );
+  const cookieStore = await cookies();
+  cookieStore.delete("auth_token");
+  return apiSuccess(null);
 }

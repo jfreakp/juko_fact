@@ -40,11 +40,11 @@ export const productRepository = {
     });
   },
 
-  async update(id: string, data: Partial<CreateProductDTO>) {
-    return prisma.product.update({ where: { id }, data });
+  async update(id: string, companyId: string, data: Partial<CreateProductDTO>) {
+    return prisma.product.updateMany({ where: { id, companyId }, data });
   },
 
-  async softDelete(id: string) {
-    return prisma.product.update({ where: { id }, data: { active: false } });
+  async softDelete(id: string, companyId: string) {
+    return prisma.product.updateMany({ where: { id, companyId }, data: { active: false } });
   },
 };

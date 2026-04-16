@@ -36,15 +36,15 @@ export const clientRepository = {
   },
 
   async update(id: string, companyId: string, data: Partial<CreateClientDTO>) {
-    return prisma.client.update({
-      where: { id },
+    return prisma.client.updateMany({
+      where: { id, companyId },
       data,
     });
   },
 
   async softDelete(id: string, companyId: string) {
-    return prisma.client.update({
-      where: { id },
+    return prisma.client.updateMany({
+      where: { id, companyId },
       data: { active: false },
     });
   },

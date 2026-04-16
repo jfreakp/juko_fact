@@ -89,7 +89,7 @@ export default function InvoicesPage() {
         title="Facturas"
         subtitle="Gestión de comprobantes electrónicos"
         action={
-          <Link href="/dashboard/invoices/new">
+          <Link href="/invoices/new">
             <Button>+ Nueva Factura</Button>
           </Link>
         }
@@ -120,7 +120,7 @@ export default function InvoicesPage() {
         ) : !data || data.items.length === 0 ? (
           <div className="p-8 text-center">
             <p className="text-gray-400 mb-3">No hay facturas</p>
-            <Link href="/dashboard/invoices/new">
+            <Link href="/invoices/new">
               <Button size="sm">Crear primera factura</Button>
             </Link>
           </div>
@@ -181,7 +181,7 @@ export default function InvoicesPage() {
                             <Button size="sm" variant="secondary">RIDE</Button>
                           </a>
                         )}
-                        <Link href={`/dashboard/invoices/${inv.id}`}>
+                        <Link href={`/invoices/${inv.id}`}>
                           <Button size="sm" variant="ghost">Ver</Button>
                         </Link>
                       </div>

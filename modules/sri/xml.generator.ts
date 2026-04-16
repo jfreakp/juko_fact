@@ -52,6 +52,9 @@ export function buildInvoiceXML(data: InvoiceForXML): string {
     .txt(TIPO_IDENTIFICACION_CODIGO[client.tipoIdentif] ?? "05");
   infoFact.ele("razonSocialComprador").txt(client.razonSocial);
   infoFact.ele("identificacionComprador").txt(client.identificacion);
+  if (client.direccion) {
+    infoFact.ele("direccionComprador").txt(client.direccion);
+  }
 
   const subtotalSinImpuestos =
     Number(invoice.subtotal0) +
@@ -96,10 +99,22 @@ export function buildInvoiceXML(data: InvoiceForXML): string {
       (Number(invoice.subtotal15) * 15) / 100
     );
   }
+  // Items sin IVA (No Objeto de Impuesto — codigoPorcentaje 6)
+  if (Number(invoice.subtotalNoIva) > 0) {
+    addTotalImpuesto(totalConImpuestos, "2", "6", invoice.subtotalNoIva, 0);
+  }
 
   infoFact.ele("propina").txt(fmt(Number(invoice.propina)));
   infoFact.ele("importeTotal").txt(fmt(Number(invoice.importeTotal)));
   infoFact.ele("moneda").txt("DOLAR");
+
+  // ── pagos ─────────────────────────────────────────────────────────────────
+  // Obligatorio según ficha técnica SRI (Tabla 24).
+  // formaPago "01" = sin utilización del sistema financiero (contado/efectivo)
+  const pagosEl = infoFact.ele("pagos");
+  const pagoEl = pagosEl.ele("pago");
+  pagoEl.ele("formaPago").txt((invoice as { formaPago?: string }).formaPago ?? "01");
+  pagoEl.ele("total").txt(fmt(Number(invoice.importeTotal)));
 
   // ── detalles ──────────────────────────────────────────────────────────────
   const detallesEl = root.ele("detalles");

@@ -27,11 +27,11 @@ export const productService = {
 
   async update(id: string, companyId: string, dto: Partial<CreateProductDTO>) {
     await productService.getById(id, companyId);
-    return productRepository.update(id, dto);
+    return productRepository.update(id, companyId, dto);
   },
 
   async delete(id: string, companyId: string) {
     await productService.getById(id, companyId);
-    return productRepository.softDelete(id);
+    return productRepository.softDelete(id, companyId);
   },
 };

@@ -3,7 +3,7 @@ import { verifyToken } from "./lib/auth";
 
 const PUBLIC_PATHS = ["/login", "/api/auth/login"];
 
-export function middleware(request: NextRequest) {
+export function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
   // Allow public paths

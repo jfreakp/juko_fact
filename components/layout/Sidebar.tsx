@@ -5,7 +5,7 @@ import { usePathname, useRouter } from "next/navigation";
 
 const navItems = [
   {
-    href: "/dashboard",
+    href: "/",
     label: "Dashboard",
     icon: (
       <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -14,7 +14,7 @@ const navItems = [
     ),
   },
   {
-    href: "/dashboard/invoices",
+    href: "/invoices",
     label: "Facturas",
     icon: (
       <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -24,7 +24,7 @@ const navItems = [
     ),
   },
   {
-    href: "/dashboard/clients",
+    href: "/clients",
     label: "Clientes",
     icon: (
       <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -34,7 +34,7 @@ const navItems = [
     ),
   },
   {
-    href: "/dashboard/products",
+    href: "/products",
     label: "Productos",
     icon: (
       <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -44,7 +44,7 @@ const navItems = [
     ),
   },
   {
-    href: "/dashboard/company",
+    href: "/company",
     label: "Empresa",
     icon: (
       <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -61,7 +61,7 @@ export default function Sidebar() {
 
   async function handleLogout() {
     await fetch("/api/auth/logout", { method: "POST" });
-    router.push("/login");
+    window.location.href = "/login";
   }
 
   return (
@@ -86,8 +86,8 @@ export default function Sidebar() {
       <nav className="flex-1 px-3 py-4 space-y-1">
         {navItems.map((item) => {
           const active =
-            item.href === "/dashboard"
-              ? pathname === "/dashboard"
+            item.href === "/"
+              ? pathname === "/"
               : pathname.startsWith(item.href);
 
           return (

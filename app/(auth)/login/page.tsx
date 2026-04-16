@@ -1,12 +1,10 @@
 "use client";
 
 import { useState, FormEvent } from "react";
-import { useRouter } from "next/navigation";
 import Input from "@/components/ui/Input";
 import Button from "@/components/ui/Button";
 
 export default function LoginPage() {
-  const router = useRouter();
   const [email, setEmail] = useState("admin@empresa.com");
   const [password, setPassword] = useState("admin123");
   const [error, setError] = useState("");
@@ -31,8 +29,7 @@ export default function LoginPage() {
         return;
       }
 
-      router.push("/dashboard");
-      router.refresh();
+      window.location.href = "/";
     } catch {
       setError("Error de conexión. Intente nuevamente.");
     } finally {

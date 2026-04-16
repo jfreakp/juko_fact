@@ -78,7 +78,7 @@ export default function DashboardPage() {
         title="Dashboard"
         subtitle="Resumen de facturación electrónica"
         action={
-          <Link href="/dashboard/invoices/new">
+          <Link href="/invoices/new">
             <Button>+ Nueva Factura</Button>
           </Link>
         }
@@ -109,7 +109,7 @@ export default function DashboardPage() {
       <div className="bg-white rounded-xl shadow-sm border">
         <div className="px-6 py-4 border-b flex items-center justify-between">
           <h2 className="font-semibold text-gray-900">Últimas Facturas</h2>
-          <Link href="/dashboard/invoices" className="text-sm text-blue-600 hover:underline">
+          <Link href="/invoices" className="text-sm text-blue-600 hover:underline">
             Ver todas →
           </Link>
         </div>
@@ -119,7 +119,7 @@ export default function DashboardPage() {
         ) : recent.length === 0 ? (
           <div className="p-8 text-center">
             <p className="text-gray-400 mb-4">No hay facturas aún</p>
-            <Link href="/dashboard/invoices/new">
+            <Link href="/invoices/new">
               <Button size="sm">Crear primera factura</Button>
             </Link>
           </div>

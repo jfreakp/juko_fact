@@ -1,8 +1,7 @@
-import { NextRequest } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { authService } from "@/modules/auth/auth.service";
-import { apiSuccess, apiError } from "@/lib/api";
-import { createAuthCookieHeader } from "@/lib/auth";
+import { apiError } from "@/lib/api";
 
 const loginSchema = z.object({
   email: z.string().email("Email inválido"),
@@ -19,16 +18,15 @@ export async function POST(req: NextRequest) {
 
     const { token, user } = await authService.login(parsed.data);
 
-    return new Response(
-      JSON.stringify({ success: true, data: { user } }),
-      {
-        status: 200,
-        headers: {
-          "Content-Type": "application/json",
-          "Set-Cookie": createAuthCookieHeader(token),
-        },
-      }
-    );
+    const response = NextResponse.json({ success: true, data: { user } });
+    response.cookies.set("auth_token", token, {
+      httpOnly: true,
+      path: "/",
+      maxAge: 8 * 60 * 60,
+      sameSite: "lax",
+      secure: process.env.NODE_ENV === "production",
+    });
+    return response;
   } catch (err) {
     const message = err instanceof Error ? err.message : "Error de autenticación";
     return apiError(message, 401);

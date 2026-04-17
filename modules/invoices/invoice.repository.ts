@@ -120,9 +120,8 @@ export const invoiceRepository = {
       totalIva += valorIva;
 
       if (d.tipoIva === "IVA_0") subtotal0 += precioTotalSinImpuesto;
-      else if (d.tipoIva === "IVA_12") subtotal12 += precioTotalSinImpuesto;
+      else if (d.tipoIva === "IVA_STANDARD") subtotal15 += precioTotalSinImpuesto;
       else if (d.tipoIva === "IVA_5") subtotal5 += precioTotalSinImpuesto;
-      else if (d.tipoIva === "IVA_15") subtotal15 += precioTotalSinImpuesto;
       else subtotalNoIva += precioTotalSinImpuesto;
 
       return {
@@ -142,7 +141,7 @@ export const invoiceRepository = {
 
     const importeTotal =
       Math.round(
-        (subtotal0 + subtotal12 + subtotal5 + subtotal15 + subtotalNoIva + totalIva) *
+        (subtotal0 + subtotal5 + subtotal15 + subtotalNoIva + totalIva) *
           100
       ) / 100;
 

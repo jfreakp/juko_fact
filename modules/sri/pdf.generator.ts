@@ -49,8 +49,7 @@ export function generateRIDEHtml(
   const subtotalRows = [
     { label: "SUBTOTAL 0%",   value: Number(invoice.subtotal0) },
     { label: "SUBTOTAL 5%",   value: Number(invoice.subtotal5) },
-    { label: "SUBTOTAL 12%",  value: Number(invoice.subtotal12) },
-    { label: "SUBTOTAL 15%",  value: Number(invoice.subtotal15) },
+    { label: `SUBTOTAL ${process.env.NEXT_PUBLIC_IVA_RATE ?? 15}%`, value: Number(invoice.subtotal15) },
   ]
     .filter((r) => r.value > 0)
     .map(

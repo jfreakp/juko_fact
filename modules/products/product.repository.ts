@@ -47,4 +47,12 @@ export const productRepository = {
   async softDelete(id: string, companyId: string) {
     return prisma.product.updateMany({ where: { id, companyId }, data: { active: false } });
   },
+
+  async markFavorite(id: string, companyId: string) {
+    return prisma.product.updateMany({ where: { id, companyId }, data: { isFavorite: true } });
+  },
+
+  async unmarkFavorite(id: string, companyId: string) {
+    return prisma.product.updateMany({ where: { id, companyId }, data: { isFavorite: false } });
+  },
 };

@@ -8,7 +8,7 @@ const productSchema = z.object({
   codigoAuxiliar: z.string().optional(),
   descripcion: z.string().min(1, "Descripción requerida"),
   precio: z.number().positive("Precio debe ser positivo"),
-  tipoIva: z.enum(["IVA_0", "IVA_5", "IVA_12", "IVA_15", "NO_APLICA"]),
+  tipoIva: z.enum(["IVA_0", "IVA_5", "IVA_STANDARD", "NO_APLICA"]),
   tipo: z.enum(["BIEN", "SERVICIO"]),
 });
 

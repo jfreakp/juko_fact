@@ -8,7 +8,7 @@ const updateSchema = z.object({
   codigoAuxiliar: z.string().optional(),
   descripcion: z.string().min(1).optional(),
   precio: z.number().positive().optional(),
-  tipoIva: z.enum(["IVA_0", "IVA_5", "IVA_12", "IVA_15", "NO_APLICA"]).optional(),
+  tipoIva: z.enum(["IVA_0", "IVA_5", "IVA_STANDARD", "NO_APLICA"]).optional(),
   tipo: z.enum(["BIEN", "SERVICIO"]).optional(),
 });
 

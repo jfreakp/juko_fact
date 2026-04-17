@@ -79,14 +79,15 @@ export function buildInvoiceXML(data: InvoiceForXML): string {
   if (Number(invoice.subtotal0) > 0) {
     addTotalImpuesto(totalConImpuestos, "2", "0", invoice.subtotal0, 0);
   }
-  if (Number(invoice.subtotal12) > 0) {
-    addTotalImpuesto(totalConImpuestos, "2", "2", invoice.subtotal12, ivaByTipo["IVA_12"] ?? 0);
-  }
   if (Number(invoice.subtotal5) > 0) {
     addTotalImpuesto(totalConImpuestos, "2", "5", invoice.subtotal5, ivaByTipo["IVA_5"] ?? 0);
   }
   if (Number(invoice.subtotal15) > 0) {
-    addTotalImpuesto(totalConImpuestos, "2", "4", invoice.subtotal15, ivaByTipo["IVA_15"] ?? 0);
+    addTotalImpuesto(
+      totalConImpuestos, "2", IVA_CODIGO_PORCENTAJE["IVA_STANDARD"] ?? "4",
+      invoice.subtotal15,
+      ivaByTipo["IVA_STANDARD"] ?? 0
+    );
   }
   // Items sin IVA (No Objeto de Impuesto — codigoPorcentaje 6)
   if (Number(invoice.subtotalNoIva) > 0) {

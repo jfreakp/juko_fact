@@ -65,7 +65,7 @@ export type CreateProductDTO = {
   codigoAuxiliar?: string;
   descripcion: string;
   precio: number;
-  tipoIva: "IVA_0" | "IVA_5" | "IVA_12" | "IVA_15" | "NO_APLICA";
+  tipoIva: "IVA_0" | "IVA_5" | "IVA_STANDARD" | "NO_APLICA";
   tipo: "BIEN" | "SERVICIO";
 };
 
@@ -77,7 +77,7 @@ export type CreateInvoiceDetailDTO = {
   cantidad: number;
   precioUnitario: number;
   descuento?: number;
-  tipoIva: "IVA_0" | "IVA_5" | "IVA_12" | "IVA_15" | "NO_APLICA";
+  tipoIva: "IVA_0" | "IVA_5" | "IVA_STANDARD" | "NO_APLICA";
 };
 
 export type CreateInvoiceDTO = {
@@ -145,19 +145,25 @@ export interface SRIAuthorizationResponse {
 
 // ─── IVA helpers ─────────────────────────────────────────────────────────────
 
+const _IVA_RATE = Number(process.env.NEXT_PUBLIC_IVA_RATE ?? 15);
+
+// Mapea el porcentaje de IVA al código SRI (Tabla 17).
+function _sriCode(rate: number): string {
+  const map: Record<number, string> = { 0: "0", 5: "5", 12: "2", 14: "3", 15: "4" };
+  return map[rate] ?? "4";
+}
+
 export const IVA_RATES: Record<string, number> = {
   IVA_0: 0,
   IVA_5: 5,
-  IVA_12: 12,
-  IVA_15: 15,
+  IVA_STANDARD: _IVA_RATE,
   NO_APLICA: 0,
 };
 
 export const IVA_CODIGO_PORCENTAJE: Record<string, string> = {
   IVA_0: "0",
   IVA_5: "5",
-  IVA_12: "2",
-  IVA_15: "4",
+  IVA_STANDARD: _sriCode(_IVA_RATE),
   NO_APLICA: "6",
 };
 

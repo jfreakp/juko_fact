@@ -17,14 +17,14 @@ interface Product {
   precio: number;
   tipoIva: string;
   tipo: string;
+  isFavorite: boolean;
 }
 
+const IVA_RATE = Number(process.env.NEXT_PUBLIC_IVA_RATE ?? 15);
+
 const IVA_OPTIONS = [
-  { value: "IVA_0", label: "IVA 0%" },
-  { value: "IVA_5", label: "IVA 5%" },
-  { value: "IVA_12", label: "IVA 12%" },
-  { value: "IVA_15", label: "IVA 15%" },
-  { value: "NO_APLICA", label: "No aplica" },
+  { value: "IVA_0", label: "0%" },
+  { value: "IVA_STANDARD", label: `${IVA_RATE}%` },
 ];
 
 const TIPO_OPTIONS = [
@@ -35,8 +35,7 @@ const TIPO_OPTIONS = [
 const IVA_LABEL: Record<string, string> = {
   IVA_0: "0%",
   IVA_5: "5%",
-  IVA_12: "12%",
-  IVA_15: "15%",
+  IVA_STANDARD: `${IVA_RATE}%`,
   NO_APLICA: "N/A",
 };
 
@@ -45,7 +44,7 @@ const emptyForm = {
   codigoAuxiliar: "",
   descripcion: "",
   precio: "",
-  tipoIva: "IVA_12",
+  tipoIva: "IVA_STANDARD",
   tipo: "BIEN",
 };
 
@@ -58,6 +57,7 @@ export default function ProductsPage() {
   const [editProduct, setEditProduct] = useState<Product | null>(null);
   const [form, setForm] = useState(emptyForm);
   const [saving, setSaving] = useState(false);
+  const [togglingFavorite, setTogglingFavorite] = useState<string | null>(null);
 
   async function loadProducts() {
     const res = await fetch(`/api/products?search=${search}`);
@@ -107,6 +107,30 @@ export default function ProductsPage() {
       toastError(err instanceof Error ? err.message : "Error al guardar");
     } finally {
       setSaving(false);
+    }
+  }
+
+  async function handleToggleFavorite(product: Product) {
+    if (togglingFavorite === product.id) return;
+    // Double-click only marks as favorite; removing is via the star button (isFavorite toggle)
+    const next = !product.isFavorite;
+    setTogglingFavorite(product.id);
+    try {
+      const res = await fetch(`/api/products/${product.id}/favorite`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ isFavorite: next }),
+      });
+      const data = await res.json();
+      if (!data.success) throw new Error(data.error);
+      setProducts((prev) =>
+        prev.map((p) => (p.id === product.id ? { ...p, isFavorite: next } : p))
+      );
+      success(next ? "Marcado como favorito" : "Quitado de favoritos");
+    } catch (err) {
+      toastError(err instanceof Error ? err.message : "Error al actualizar favorito");
+    } finally {
+      setTogglingFavorite(null);
     }
   }
 
@@ -165,14 +189,14 @@ export default function ProductsPage() {
           <table className="w-full">
             <thead>
               <tr style={{ background: "var(--surface-low)" }}>
-                {["Código", "Descripción", "Tipo", "Precio", "IVA", ""].map((h) => (
+                {(["fav", "Código", "Descripción", "Tipo", "Precio", "IVA", "acciones"] as const).map((h) => (
                   <th
                     key={h}
                     className={`px-6 py-3 text-[9px] font-bold tracking-[0.15em] uppercase
-                      ${h === "Precio" || h === "" ? "text-right" : h === "IVA" ? "text-center" : "text-left"}`}
+                      ${h === "Precio" || h === "acciones" ? "text-right" : h === "IVA" || h === "fav" ? "text-center" : "text-left"}`}
                     style={{ color: "var(--text-muted)" }}
                   >
-                    {h}
+                    {h === "fav" || h === "acciones" ? "" : h}
                   </th>
                 ))}
               </tr>
@@ -182,7 +206,22 @@ export default function ProductsPage() {
                 <tr
                   key={p.id}
                   style={{ background: idx % 2 === 0 ? "var(--surface-white)" : "var(--surface)" }}
+                  onDoubleClick={() => { if (!p.isFavorite) handleToggleFavorite(p); }}
+                  title={p.isFavorite ? "Producto favorito" : "Doble clic para marcar como favorito"}
+                  className="cursor-pointer"
                 >
+                  <td className="px-4 py-3.5 text-center w-10">
+                    <button
+                      type="button"
+                      onClick={(e) => { e.stopPropagation(); handleToggleFavorite(p); }}
+                      disabled={togglingFavorite === p.id}
+                      title={p.isFavorite ? "Quitar de favoritos" : "Marcar como favorito"}
+                      className="text-lg leading-none transition-transform hover:scale-125"
+                      style={{ color: p.isFavorite ? "#FFD700" : "var(--text-muted)", opacity: togglingFavorite === p.id ? 0.5 : 1 }}
+                    >
+                      {p.isFavorite ? "★" : "☆"}
+                    </button>
+                  </td>
                   <td className="px-6 py-3.5 font-mono text-sm font-semibold" style={{ color: "var(--text-base)" }}>
                     {p.codigoPrincipal}
                   </td>

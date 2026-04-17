@@ -34,4 +34,14 @@ export const productService = {
     await productService.getById(id, companyId);
     return productRepository.softDelete(id, companyId);
   },
+
+  async markFavorite(id: string, companyId: string) {
+    await productService.getById(id, companyId);
+    return productRepository.markFavorite(id, companyId);
+  },
+
+  async unmarkFavorite(id: string, companyId: string) {
+    await productService.getById(id, companyId);
+    return productRepository.unmarkFavorite(id, companyId);
+  },
 };

@@ -11,7 +11,7 @@ const detailSchema = z.object({
   cantidad: z.number().positive("Cantidad debe ser positiva"),
   precioUnitario: z.number().positive("Precio debe ser positivo"),
   descuento: z.number().min(0).optional(),
-  tipoIva: z.enum(["IVA_0", "IVA_5", "IVA_12", "IVA_15", "NO_APLICA"]),
+  tipoIva: z.enum(["IVA_0", "IVA_5", "IVA_STANDARD", "NO_APLICA"]),
 });
 
 const invoiceSchema = z.object({

@@ -22,6 +22,7 @@ interface Product {
   descripcion: string;
   precio: number;
   tipoIva: string;
+  isFavorite: boolean;
 }
 
 interface DetailLine {
@@ -35,27 +36,24 @@ interface DetailLine {
   tipoIva: string;
 }
 
+const IVA_RATE = Number(process.env.NEXT_PUBLIC_IVA_RATE ?? 15);
+
 const IVA_OPTIONS = [
-  { value: "IVA_0", label: "IVA 0%" },
-  { value: "IVA_5", label: "IVA 5%" },
-  { value: "IVA_12", label: "IVA 12%" },
-  { value: "IVA_15", label: "IVA 15%" },
-  { value: "NO_APLICA", label: "N/A" },
+  { value: "IVA_0", label: "0%" },
+  { value: "IVA_STANDARD", label: `${IVA_RATE}%` },
 ];
 
 const IVA_RATES: Record<string, number> = {
   IVA_0: 0,
   IVA_5: 5,
-  IVA_12: 12,
-  IVA_15: 15,
+  IVA_STANDARD: IVA_RATE,
   NO_APLICA: 0,
 };
 
 const IVA_LABEL: Record<string, string> = {
   IVA_0: "0%",
   IVA_5: "5%",
-  IVA_12: "12%",
-  IVA_15: "15%",
+  IVA_STANDARD: `${IVA_RATE}%`,
   NO_APLICA: "N/A",
 };
 
@@ -68,7 +66,7 @@ function emptyLine(): DetailLine {
     cantidad: "1",
     precioUnitario: "0.00",
     descuento: "0.00",
-    tipoIva: "IVA_12",
+    tipoIva: "IVA_STANDARD",
   };
 }
 
@@ -364,6 +362,83 @@ function ProductPicker({ products, selected, onSelect, onClear }: ProductPickerP
   );
 }
 
+// ── Favorites Bar ────────────────────────────────────────────────────────────
+interface FavoritesBarProps {
+  favorites: Product[];
+  onAdd: (p: Product) => void;
+}
+
+function FavoritesBar({ favorites, onAdd }: FavoritesBarProps) {
+  const [collapsed, setCollapsed] = useState(favorites.length === 0);
+
+  if (favorites.length === 0) return null;
+
+  return (
+    <div
+      className="rounded-xl overflow-hidden mb-6"
+      style={{ background: "var(--surface-white)", border: "2px solid #FFD700" }}
+    >
+      <button
+        type="button"
+        className="w-full px-5 py-3 flex items-center gap-2 text-left"
+        style={{ borderBottom: collapsed ? "none" : "1px solid var(--surface-highest)" }}
+        onClick={() => setCollapsed((c) => !c)}
+      >
+        <span className="text-base leading-none" style={{ color: "#FFD700" }}>★</span>
+        <span
+          className="text-[10px] font-bold tracking-[0.15em] uppercase flex-1"
+          style={{ color: "var(--text-muted)" }}
+        >
+          Favoritos · {favorites.length} {favorites.length === 1 ? "producto" : "productos"} · clic para agregar
+        </span>
+        <svg
+          className="w-3.5 h-3.5 flex-shrink-0 transition-transform"
+          style={{ color: "var(--text-muted)", transform: collapsed ? "rotate(0deg)" : "rotate(180deg)" }}
+          fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}
+        >
+          <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
+        </svg>
+      </button>
+
+      {!collapsed && (
+        <div className="px-5 py-3 flex flex-wrap gap-2">
+          {favorites.map((p) => (
+            <button
+              key={p.id}
+              type="button"
+              onClick={() => onAdd(p)}
+              className="flex items-center gap-2 px-3 py-2 rounded-xl text-sm font-bold transition-colors"
+              style={{
+                background: "var(--surface-low)",
+                border: "2px solid var(--border-subtle)",
+                color: "var(--text-base)",
+              }}
+              onMouseEnter={(e) => {
+                (e.currentTarget as HTMLElement).style.borderColor = "#FFD700";
+                (e.currentTarget as HTMLElement).style.background = "var(--surface)";
+              }}
+              onMouseLeave={(e) => {
+                (e.currentTarget as HTMLElement).style.borderColor = "var(--border-subtle)";
+                (e.currentTarget as HTMLElement).style.background = "var(--surface-low)";
+              }}
+              title={`${p.descripcion} · $${Number(p.precio).toFixed(2)} · IVA ${IVA_LABEL[p.tipoIva]}`}
+            >
+              <span style={{ color: "#FFD700" }}>★</span>
+              <span className="max-w-[160px] truncate">{p.descripcion}</span>
+              <span
+                className="text-[10px] font-bold tracking-widest uppercase px-1.5 py-0.5 rounded"
+                style={{ background: "var(--success-bg)", color: "var(--success-text)" }}
+              >
+                ${Number(p.precio).toFixed(2)}
+              </span>
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
 // ── Main Page ───────────────────────────────────────────────────────────────
 export default function NewInvoicePage() {
   const router = useRouter();
@@ -404,6 +479,13 @@ export default function NewInvoicePage() {
   }
 
   function selectProduct(lineId: string, product: Product) {
+    const alreadyInOtherLine = lines.some(
+      (l) => l.id !== lineId && l.productId === product.id
+    );
+    if (alreadyInOtherLine) {
+      toastError(`"${product.descripcion}" ya está en el detalle`);
+      return;
+    }
     updateLine(lineId, {
       productId: product.id,
       codigoPrincipal: product.codigoPrincipal,
@@ -413,13 +495,38 @@ export default function NewInvoicePage() {
     });
   }
 
+  function addFavoriteProduct(product: Product) {
+    if (lines.some((l) => l.productId === product.id)) {
+      toastError(`"${product.descripcion}" ya está en el detalle`);
+      return;
+    }
+    const emptyIndex = lines.findIndex((l) => !l.productId && !l.descripcion);
+    if (emptyIndex !== -1) {
+      setLines((prev) =>
+        prev.map((l, i) =>
+          i === emptyIndex
+            ? { ...l, productId: product.id, codigoPrincipal: product.codigoPrincipal, descripcion: product.descripcion, precioUnitario: String(product.precio), tipoIva: product.tipoIva }
+            : l
+        )
+      );
+    } else {
+      const newLine = emptyLine();
+      newLine.productId = product.id;
+      newLine.codigoPrincipal = product.codigoPrincipal;
+      newLine.descripcion = product.descripcion;
+      newLine.precioUnitario = String(product.precio);
+      newLine.tipoIva = product.tipoIva;
+      setLines((prev) => [...prev, newLine]);
+    }
+  }
+
   function clearProduct(lineId: string) {
     updateLine(lineId, {
       productId: undefined,
       codigoPrincipal: "",
       descripcion: "",
       precioUnitario: "0.00",
-      tipoIva: "IVA_12",
+      tipoIva: "IVA_STANDARD",
     });
   }
 
@@ -594,6 +701,12 @@ export default function NewInvoicePage() {
           </div>
         </div>
 
+        {/* Favorites quick-add bar */}
+        <FavoritesBar
+          favorites={products.filter((p) => p.isFavorite)}
+          onAdd={addFavoriteProduct}
+        />
+
         {/* Line items — card layout */}
         <div className="rounded-xl overflow-hidden" style={{ background: "var(--surface-white)" }}>
           <div
@@ -676,7 +789,7 @@ export default function NewInvoicePage() {
 
                   {/* Row 2: description + numeric fields + subtotal */}
                   <div className="pl-9 grid grid-cols-12 gap-3 items-end">
-                    {/* Description */}
+                    {/* Description — read only */}
                     <div className="col-span-12 sm:col-span-4">
                       <label
                         className="text-[9px] font-bold tracking-[0.15em] uppercase block mb-1"
@@ -684,19 +797,20 @@ export default function NewInvoicePage() {
                       >
                         Descripción
                       </label>
-                      <input
-                        className="w-full px-3 py-2 rounded-lg text-sm font-medium outline-none transition-colors"
-                        style={inputStyle}
-                        value={line.descripcion}
-                        onChange={(e) => updateLine(line.id, { descripcion: e.target.value })}
-                        placeholder="Descripción del ítem"
-                        required
-                        onFocus={(e) => (e.currentTarget.style.borderColor = "var(--primary-focus)")}
-                        onBlur={(e) => (e.currentTarget.style.borderColor = "var(--border-subtle)")}
-                      />
+                      <div
+                        className="px-3 py-2 rounded-lg text-sm font-medium truncate"
+                        style={{
+                          background: "var(--surface-low)",
+                          color: line.descripcion ? "var(--text-base)" : "var(--text-muted)",
+                          border: "2px solid transparent",
+                        }}
+                        title={line.descripcion || "—"}
+                      >
+                        {line.descripcion || "—"}
+                      </div>
                     </div>
 
-                    {/* Cantidad */}
+                    {/* Cantidad — editable */}
                     <div className="col-span-4 sm:col-span-2">
                       <label
                         className="text-[9px] font-bold tracking-[0.15em] uppercase block mb-1"
@@ -715,7 +829,7 @@ export default function NewInvoicePage() {
                       />
                     </div>
 
-                    {/* Precio unitario */}
+                    {/* Precio unitario — read only */}
                     <div className="col-span-4 sm:col-span-2">
                       <label
                         className="text-[9px] font-bold tracking-[0.15em] uppercase block mb-1"
@@ -723,18 +837,19 @@ export default function NewInvoicePage() {
                       >
                         P. Unitario
                       </label>
-                      <input
-                        type="number" step="0.01" min="0"
-                        className="w-full px-3 py-2 rounded-lg text-sm font-medium text-right outline-none transition-colors"
-                        style={inputStyle}
-                        value={line.precioUnitario}
-                        onChange={(e) => updateLine(line.id, { precioUnitario: e.target.value })}
-                        onFocus={(e) => (e.currentTarget.style.borderColor = "var(--primary-focus)")}
-                        onBlur={(e) => (e.currentTarget.style.borderColor = "var(--border-subtle)")}
-                      />
+                      <div
+                        className="px-3 py-2 rounded-lg text-sm font-medium text-right"
+                        style={{
+                          background: "var(--surface-low)",
+                          color: "var(--text-base)",
+                          border: "2px solid transparent",
+                        }}
+                      >
+                        ${Number(line.precioUnitario || 0).toFixed(2)}
+                      </div>
                     </div>
 
-                    {/* Descuento */}
+                    {/* Descuento — read only */}
                     <div className="col-span-4 sm:col-span-2">
                       <label
                         className="text-[9px] font-bold tracking-[0.15em] uppercase block mb-1"
@@ -742,18 +857,19 @@ export default function NewInvoicePage() {
                       >
                         Descuento
                       </label>
-                      <input
-                        type="number" step="0.01" min="0"
-                        className="w-full px-3 py-2 rounded-lg text-sm font-medium text-right outline-none transition-colors"
-                        style={inputStyle}
-                        value={line.descuento}
-                        onChange={(e) => updateLine(line.id, { descuento: e.target.value })}
-                        onFocus={(e) => (e.currentTarget.style.borderColor = "var(--primary-focus)")}
-                        onBlur={(e) => (e.currentTarget.style.borderColor = "var(--border-subtle)")}
-                      />
+                      <div
+                        className="px-3 py-2 rounded-lg text-sm font-medium text-right"
+                        style={{
+                          background: "var(--surface-low)",
+                          color: "var(--text-base)",
+                          border: "2px solid transparent",
+                        }}
+                      >
+                        ${Number(line.descuento || 0).toFixed(2)}
+                      </div>
                     </div>
 
-                    {/* IVA */}
+                    {/* IVA — read only */}
                     <div className="col-span-6 sm:col-span-1">
                       <label
                         className="text-[9px] font-bold tracking-[0.15em] uppercase block mb-1"
@@ -761,18 +877,16 @@ export default function NewInvoicePage() {
                       >
                         IVA
                       </label>
-                      <select
-                        className="w-full px-2 py-2 rounded-lg text-xs font-bold outline-none transition-colors"
-                        style={inputStyle}
-                        value={line.tipoIva}
-                        onChange={(e) => updateLine(line.id, { tipoIva: e.target.value })}
-                        onFocus={(e) => (e.currentTarget.style.borderColor = "var(--primary-focus)")}
-                        onBlur={(e) => (e.currentTarget.style.borderColor = "var(--border-subtle)")}
+                      <div
+                        className="px-2 py-2 rounded-lg text-xs font-bold text-center"
+                        style={{
+                          background: "var(--surface-low)",
+                          color: "var(--text-base)",
+                          border: "2px solid transparent",
+                        }}
                       >
-                        {IVA_OPTIONS.map((o) => (
-                          <option key={o.value} value={o.value}>{o.label}</option>
-                        ))}
-                      </select>
+                        {IVA_LABEL[line.tipoIva] ?? "—"}
+                      </div>
                     </div>
 
                     {/* Subtotal — read only display */}

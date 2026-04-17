@@ -53,6 +53,9 @@ export default function InvoiceDetailPage({
   const [invoice, setInvoice] = useState<InvoiceData | null>(null);
   const [loading, setLoading] = useState(true);
   const [processing, setProcessing] = useState(false);
+  const [showAnularModal, setShowAnularModal] = useState(false);
+  const [motivo, setMotivo] = useState("");
+  const [anulando, setAnulando] = useState(false);
 
   async function load() {
     const res = await fetch(`/api/invoices/${id}`);
@@ -82,6 +85,27 @@ export default function InvoiceDetailPage({
     }
   }
 
+  async function anularFactura() {
+    setAnulando(true);
+    try {
+      const res = await fetch(`/api/invoices/${id}/anular`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ motivo }),
+      });
+      const data = await res.json();
+      if (!data.success) throw new Error(data.error);
+      success("Factura anulada correctamente");
+      setShowAnularModal(false);
+      setMotivo("");
+      load();
+    } catch (err) {
+      toastError(err instanceof Error ? err.message : "Error al anular");
+    } finally {
+      setAnulando(false);
+    }
+  }
+
   if (loading) {
     return (
       <div style={{ background: "var(--surface)" }} className="min-h-screen p-8">
@@ -103,6 +127,7 @@ export default function InvoiceDetailPage({
   const serie = `${invoice.company.estab}-${invoice.company.ptoEmi}-${invoice.secuencial}`;
 
   return (
+    <>
     <div style={{ background: "var(--surface)" }} className="min-h-screen p-8">
       <Header
         title={`Factura ${serie}`}
@@ -116,6 +141,9 @@ export default function InvoiceDetailPage({
               <a href={`/api/invoices/${id}/pdf`} target="_blank" rel="noreferrer">
                 <Button variant="secondary">Ver RIDE</Button>
               </a>
+            )}
+            {invoice.estado !== "ANULADO" && (
+              <Button variant="danger" onClick={() => setShowAnularModal(true)}>Anular</Button>
             )}
             <Button variant="ghost" onClick={() => router.back()}>← Volver</Button>
           </div>
@@ -319,6 +347,57 @@ export default function InvoiceDetailPage({
         </div>
       </div>
     </div>
+
+    {/* ── Modal de anulación ── */}
+    {showAnularModal && (
+      <div
+        className="fixed inset-0 z-50 flex items-center justify-center p-4"
+        style={{ background: "rgba(0,0,0,0.5)" }}
+        onClick={(e) => { if (e.target === e.currentTarget) setShowAnularModal(false); }}
+      >
+        <div className="rounded-xl p-6 w-full max-w-md" style={{ background: "var(--surface-white)" }}>
+          <h2 className="text-base font-black mb-1" style={{ color: "var(--text-base)" }}>
+            Anular factura {serie}
+          </h2>
+
+          {invoice.estado === "AUTORIZADO" && (
+            <div
+              className="rounded-lg px-3 py-2 mb-4 mt-3 text-[11px] font-semibold"
+              style={{ background: "var(--warning-bg, #fff8e1)", color: "var(--warning-text, #b45309)" }}
+            >
+              Esta factura ya fue autorizada por el SRI. Al anularla en este sistema, el registro permanece en el SRI. Si necesitas anularla formalmente, hazlo también desde el portal sri.gob.ec.
+            </div>
+          )}
+
+          <p className="text-[11px] mb-4 mt-3" style={{ color: "var(--text-muted)" }}>
+            Motivo de anulación (opcional)
+          </p>
+          <textarea
+            className="w-full rounded-lg px-3 py-2 text-sm resize-none"
+            style={{
+              background: "var(--surface-low)",
+              border: "1px solid var(--surface-highest)",
+              color: "var(--text-base)",
+              outline: "none",
+            }}
+            rows={3}
+            placeholder="Ej: Factura generada por error"
+            value={motivo}
+            onChange={(e) => setMotivo(e.target.value)}
+          />
+
+          <div className="flex gap-2 justify-end mt-4">
+            <Button variant="ghost" onClick={() => { setShowAnularModal(false); setMotivo(""); }}>
+              Cancelar
+            </Button>
+            <Button variant="danger" onClick={anularFactura} loading={anulando}>
+              Confirmar anulación
+            </Button>
+          </div>
+        </div>
+      </div>
+    )}
+    </>
   );
 }
 

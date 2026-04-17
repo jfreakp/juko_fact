@@ -201,6 +201,17 @@ export const invoiceRepository = {
     });
   },
 
+  async anular(id: string, motivo?: string) {
+    return prisma.invoice.update({
+      where: { id },
+      data: {
+        estado: "ANULADO" as never,
+        motivoAnulacion: motivo ?? null,
+        fechaAnulacion: new Date(),
+      },
+    });
+  },
+
   async addSRIResponse(
     invoiceId: string,
     data: {

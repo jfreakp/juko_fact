@@ -197,6 +197,8 @@ model Invoice {
   fechaAutorizacion   DateTime?
   ambiente            Ambiente
   observaciones       String?           @db.Text
+  motivoAnulacion     String?           @db.Text
+  fechaAnulacion      DateTime?
 
   createdAt           DateTime          @default(now())
   updatedAt           DateTime          @updatedAt

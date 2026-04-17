@@ -36,6 +36,13 @@ export const invoiceService = {
     );
   },
 
+  async anular(id: string, companyId: string, motivo?: string) {
+    const invoice = await invoiceRepository.findById(id, companyId);
+    if (!invoice) throw new Error("Factura no encontrada");
+    if (invoice.estado === "ANULADO") throw new Error("La factura ya está anulada");
+    return invoiceRepository.anular(id, motivo);
+  },
+
   async getStats(companyId: string) {
     const [total, pendientes, autorizadas, rechazadas] = await Promise.all([
       invoiceRepository.findAll(companyId, { limit: 1 }),

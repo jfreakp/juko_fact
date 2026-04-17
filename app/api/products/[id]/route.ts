@@ -1,0 +1,68 @@
+import { NextRequest } from "next/server";
+import { z } from "zod";
+import { productService } from "@/modules/products/product.service";
+import { requireAuth, apiSuccess, apiError } from "@/lib/api";
+
+const updateSchema = z.object({
+  codigoPrincipal: z.string().min(1).optional(),
+  codigoAuxiliar: z.string().optional(),
+  descripcion: z.string().min(1).optional(),
+  precio: z.number().positive().optional(),
+  tipoIva: z.enum(["IVA_0", "IVA_5", "IVA_12", "IVA_15", "NO_APLICA"]).optional(),
+  tipo: z.enum(["BIEN", "SERVICIO"]).optional(),
+});
+
+export async function GET(
+  req: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  const auth = requireAuth(req);
+  if ("error" in auth) return auth.error;
+  if (!auth.payload.companyId) return apiError("Sin empresa asignada", 400);
+
+  const { id } = await params;
+  try {
+    const product = await productService.getById(id, auth.payload.companyId);
+    return apiSuccess(product);
+  } catch (err) {
+    return apiError(err instanceof Error ? err.message : "Error", 404);
+  }
+}
+
+export async function PUT(
+  req: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  const auth = requireAuth(req);
+  if ("error" in auth) return auth.error;
+  if (!auth.payload.companyId) return apiError("Sin empresa asignada", 400);
+
+  const { id } = await params;
+  try {
+    const body = await req.json();
+    const parsed = updateSchema.safeParse(body);
+    if (!parsed.success) return apiError(parsed.error.issues[0].message);
+
+    const product = await productService.update(id, auth.payload.companyId, parsed.data);
+    return apiSuccess(product);
+  } catch (err) {
+    return apiError(err instanceof Error ? err.message : "Error");
+  }
+}
+
+export async function DELETE(
+  req: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  const auth = requireAuth(req);
+  if ("error" in auth) return auth.error;
+  if (!auth.payload.companyId) return apiError("Sin empresa asignada", 400);
+
+  const { id } = await params;
+  try {
+    await productService.delete(id, auth.payload.companyId);
+    return apiSuccess({ deleted: true });
+  } catch (err) {
+    return apiError(err instanceof Error ? err.message : "Error");
+  }
+}

@@ -1,7 +1,22 @@
 import { invoiceRepository } from "./invoice.repository";
 import { companyRepository } from "@/modules/company/company.repository";
 import { clientRepository } from "@/modules/clients/client.repository";
-import type { CreateInvoiceDTO } from "@/types";
+import type { CreateInvoiceDTO, CreateInvoiceDetailDTO } from "@/types";
+import { IVA_RATES } from "@/types";
+
+function round2(n: number) {
+  return Math.round(n * 100) / 100;
+}
+
+function calcImporteTotal(details: CreateInvoiceDetailDTO[]): number {
+  let total = 0;
+  for (const d of details) {
+    const subtotal = round2(d.cantidad * d.precioUnitario - (d.descuento ?? 0));
+    const iva = round2((subtotal * (IVA_RATES[d.tipoIva] ?? 0)) / 100);
+    total += subtotal + iva;
+  }
+  return round2(total);
+}
 
 export const invoiceService = {
   async getAll(
@@ -26,6 +41,18 @@ export const invoiceService = {
 
     if (!dto.details || dto.details.length === 0) {
       throw new Error("La factura debe tener al menos un detalle");
+    }
+
+    // Validar pago si se proporcionó montoPagado
+    if (dto.montoPagado !== undefined) {
+      const importeTotal = calcImporteTotal(dto.details);
+      const mp = round2(dto.montoPagado);
+      if (mp < importeTotal) {
+        throw new Error(
+          `Monto insuficiente: se requieren $${importeTotal.toFixed(2)}, se pagaron $${mp.toFixed(2)}`
+        );
+      }
+      dto.vuelto = round2(mp - importeTotal);
     }
 
     return invoiceRepository.create(

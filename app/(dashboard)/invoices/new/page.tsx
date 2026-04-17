@@ -453,6 +453,8 @@ export default function NewInvoicePage() {
   const [observaciones, setObservaciones] = useState("");
   const [lines, setLines] = useState<DetailLine[]>([emptyLine()]);
   const [saving, setSaving] = useState(false);
+  const [montoPagado, setMontoPagado] = useState("");
+  const [metodoPago, setMetodoPago] = useState<"01" | "17" | "19">("01");
 
   useEffect(() => {
     Promise.all([
@@ -541,6 +543,19 @@ export default function NewInvoicePage() {
     { subtotal: 0, iva: 0, total: 0 }
   );
 
+  const totalFactura = Math.round(totals.total * 100) / 100;
+  const montoPagadoNum = Math.round((parseFloat(montoPagado) || 0) * 100) / 100;
+  const vuelto = Math.round((montoPagadoNum - totalFactura) * 100) / 100;
+  const isInsuficiente = montoPagadoNum > 0 && montoPagadoNum < totalFactura;
+  const canFinish = montoPagado !== "" && montoPagadoNum >= totalFactura;
+
+  function handleMontoPagadoChange(value: string) {
+    // Allow only valid numeric input with up to 2 decimal places
+    if (value === "" || /^\d+(\.\d{0,2})?$/.test(value)) {
+      setMontoPagado(value);
+    }
+  }
+
   async function handleSubmit(e: FormEvent) {
     e.preventDefault();
     if (!clientId) {
@@ -554,6 +569,15 @@ export default function NewInvoicePage() {
 
     setSaving(true);
     try {
+      if (!canFinish) {
+        toastError(
+          montoPagado === ""
+            ? "Ingrese el monto pagado por el cliente"
+            : "Monto insuficiente para cubrir el total de la factura"
+        );
+        return;
+      }
+
       const res = await fetch("/api/invoices", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -561,6 +585,8 @@ export default function NewInvoicePage() {
           clientId,
           fechaEmision,
           observaciones,
+          formaPago: metodoPago,
+          montoPagado: montoPagadoNum,
           details: lines.map((l) => ({
             productId: l.productId,
             codigoPrincipal: l.codigoPrincipal,
@@ -658,7 +684,7 @@ export default function NewInvoicePage() {
             </div>
           </div>
 
-          {/* Right: totals + submit */}
+          {/* Right: totals + payment + submit */}
           <div className="rounded-xl p-6" style={{ background: "var(--surface-white)" }}>
             <p
               className="text-[10px] font-bold tracking-[0.15em] uppercase mb-4"
@@ -690,13 +716,189 @@ export default function NewInvoicePage() {
                   Total
                 </span>
                 <span className="font-black text-xl" style={{ color: "var(--primary-focus)" }}>
-                  ${totals.total.toFixed(2)}
+                  ${totalFactura.toFixed(2)}
                 </span>
               </div>
             </div>
 
-            <Button type="submit" className="w-full mt-6" size="lg" loading={saving}>
-              Crear Factura
+            {/* Payment section */}
+            <div
+              className="mt-5 pt-5 space-y-4"
+              style={{ borderTop: "2px solid var(--surface-highest)" }}
+            >
+              <p
+                className="text-[10px] font-bold tracking-[0.15em] uppercase"
+                style={{ color: "var(--text-muted)" }}
+              >
+                Pago
+              </p>
+
+              {/* Método de pago */}
+              <div>
+                <p className="text-[9px] font-bold tracking-widest uppercase mb-2" style={{ color: "var(--text-muted)" }}>
+                  Método
+                </p>
+                <div className="grid grid-cols-3 gap-1">
+                  {(
+                    [
+                      { code: "01", label: "Efectivo" },
+                      { code: "17", label: "Transfer." },
+                      { code: "19", label: "Tarjeta" },
+                    ] as const
+                  ).map(({ code, label }) => (
+                    <button
+                      key={code}
+                      type="button"
+                      onClick={() => setMetodoPago(code)}
+                      className="py-1.5 rounded-lg text-[10px] font-bold tracking-wide transition-colors"
+                      style={
+                        metodoPago === code
+                          ? { background: "var(--primary)", color: "var(--on-primary)", border: "2px solid var(--primary-dim)" }
+                          : { background: "var(--surface-low)", color: "var(--text-muted)", border: "2px solid var(--border-subtle)" }
+                      }
+                    >
+                      {label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Monto pagado */}
+              <div>
+                <p className="text-[9px] font-bold tracking-widest uppercase mb-1.5" style={{ color: "var(--text-muted)" }}>
+                  Monto pagado
+                </p>
+                <div className="relative">
+                  <span
+                    className="absolute left-3 top-1/2 -translate-y-1/2 text-sm font-bold"
+                    style={{ color: "var(--text-muted)" }}
+                  >
+                    $
+                  </span>
+                  <input
+                    type="text"
+                    inputMode="decimal"
+                    placeholder="0.00"
+                    value={montoPagado}
+                    onChange={(e) => handleMontoPagadoChange(e.target.value)}
+                    className="w-full pl-7 pr-3 py-2 rounded-lg text-sm font-bold text-right outline-none transition-colors"
+                    style={{
+                      background: "var(--surface-white)",
+                      border: isInsuficiente
+                        ? "2px solid var(--error-strong)"
+                        : montoPagado && canFinish
+                        ? "2px solid #22a55b"
+                        : "2px solid var(--border-subtle)",
+                      color: "var(--text-base)",
+                    }}
+                    onFocus={(e) => {
+                      if (!isInsuficiente && !(montoPagado && canFinish))
+                        e.currentTarget.style.borderColor = "var(--primary-focus)";
+                    }}
+                    onBlur={(e) => {
+                      if (!isInsuficiente && !(montoPagado && canFinish))
+                        e.currentTarget.style.borderColor = "var(--border-subtle)";
+                    }}
+                  />
+                </div>
+
+                {/* Quick buttons */}
+                <div className="flex gap-1.5 mt-1.5">
+                  <button
+                    type="button"
+                    onClick={() => setMontoPagado(totalFactura.toFixed(2))}
+                    className="flex-1 py-1 rounded-md text-[9px] font-bold tracking-wide transition-colors"
+                    style={{
+                      background: "var(--surface-low)",
+                      color: "var(--text-muted)",
+                      border: "1px solid var(--border-subtle)",
+                    }}
+                    onMouseEnter={(e) => {
+                      (e.currentTarget as HTMLElement).style.background = "var(--surface-highest)";
+                      (e.currentTarget as HTMLElement).style.color = "var(--text-base)";
+                    }}
+                    onMouseLeave={(e) => {
+                      (e.currentTarget as HTMLElement).style.background = "var(--surface-low)";
+                      (e.currentTarget as HTMLElement).style.color = "var(--text-muted)";
+                    }}
+                  >
+                    Exacto
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() =>
+                      setMontoPagado(Math.ceil(totalFactura).toFixed(2))
+                    }
+                    className="flex-1 py-1 rounded-md text-[9px] font-bold tracking-wide transition-colors"
+                    style={{
+                      background: "var(--surface-low)",
+                      color: "var(--text-muted)",
+                      border: "1px solid var(--border-subtle)",
+                    }}
+                    onMouseEnter={(e) => {
+                      (e.currentTarget as HTMLElement).style.background = "var(--surface-highest)";
+                      (e.currentTarget as HTMLElement).style.color = "var(--text-base)";
+                    }}
+                    onMouseLeave={(e) => {
+                      (e.currentTarget as HTMLElement).style.background = "var(--surface-low)";
+                      (e.currentTarget as HTMLElement).style.color = "var(--text-muted)";
+                    }}
+                  >
+                    Redondear $
+                  </button>
+                </div>
+              </div>
+
+              {/* Vuelto */}
+              <div
+                className="flex items-center justify-between rounded-lg px-3 py-2.5"
+                style={{
+                  background: isInsuficiente
+                    ? "var(--error-bg)"
+                    : montoPagado && canFinish
+                    ? "#dcfce7"
+                    : "var(--surface-low)",
+                }}
+              >
+                <span
+                  className="text-xs font-bold tracking-widest uppercase"
+                  style={{
+                    color: isInsuficiente
+                      ? "var(--error-text)"
+                      : montoPagado && canFinish
+                      ? "#166534"
+                      : "var(--text-muted)",
+                  }}
+                >
+                  {isInsuficiente ? "Monto insuficiente" : "Vuelto"}
+                </span>
+                <span
+                  className="text-sm font-black"
+                  style={{
+                    color: isInsuficiente
+                      ? "var(--error-strong)"
+                      : montoPagado && canFinish
+                      ? "#166534"
+                      : "var(--text-muted)",
+                  }}
+                >
+                  {isInsuficiente
+                    ? `-$${Math.abs(vuelto).toFixed(2)}`
+                    : montoPagado
+                    ? `$${vuelto.toFixed(2)}`
+                    : "—"}
+                </span>
+              </div>
+            </div>
+
+            <Button
+              type="submit"
+              className="w-full mt-5"
+              size="lg"
+              loading={saving}
+              disabled={saving || (montoPagado !== "" && !canFinish)}
+            >
+              {isInsuficiente ? "Monto insuficiente" : "Finalizar Factura"}
             </Button>
           </div>
         </div>

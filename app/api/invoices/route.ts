@@ -19,6 +19,12 @@ const invoiceSchema = z.object({
   fechaEmision: z.string().optional(),
   details: z.array(detailSchema).min(1, "Se requiere al menos un detalle"),
   observaciones: z.string().optional(),
+  formaPago: z.string().optional(),
+  montoPagado: z
+    .number()
+    .min(0, "El monto pagado no puede ser negativo")
+    .multipleOf(0.01, "Máximo 2 decimales permitidos")
+    .optional(),
 });
 
 export async function GET(req: NextRequest) {

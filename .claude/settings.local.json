@@ -47,7 +47,9 @@
       "Bash(node:*)",
       "Bash(\"C:/facturador_sri/jre/bin/javap.exe\" -c -p \"C:/Users/jfreakp/AppData/Local/Temp/sri_decompile/FirmaDigital.class\")",
       "Bash(sed -i 's/tipoIva: \"IVA_12\" as const/tipoIva: \"IVA_STANDARD\" as const/g' prisma/seed.ts)",
-      "Bash(sed -i 's/tipoIva: \"IVA_12\"/tipoIva: \"IVA_STANDARD\"/g' scripts/test-sri.ts)"
+      "Bash(sed -i 's/tipoIva: \"IVA_12\"/tipoIva: \"IVA_STANDARD\"/g' scripts/test-sri.ts)",
+      "Bash(claude mcp:*)",
+      "Bash(ls:*)"
     ]
   }
 }

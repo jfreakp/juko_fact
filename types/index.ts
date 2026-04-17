@@ -85,6 +85,9 @@ export type CreateInvoiceDTO = {
   fechaEmision?: string;
   details: CreateInvoiceDetailDTO[];
   observaciones?: string;
+  formaPago?: string;
+  montoPagado?: number;
+  vuelto?: number;
 };
 
 // ─── SRI Types ────────────────────────────────────────────────────────────────

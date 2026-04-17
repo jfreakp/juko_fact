@@ -186,7 +186,9 @@ model Invoice {
   importeTotal        Decimal           @default(0) @db.Decimal(12, 2)
 
   // Pago
-  formaPago           String            @default("01") // Tabla 24: 01=efectivo, 19=tarjeta crédito, etc.
+  formaPago           String            @default("01") // Tabla 24: 01=efectivo, 17=transferencia, 19=tarjeta crédito
+  montoPagado         Decimal?          @db.Decimal(12, 2)
+  vuelto              Decimal?          @db.Decimal(12, 2)
 
   // SRI data
   estado              EstadoComprobante @default(PENDIENTE)

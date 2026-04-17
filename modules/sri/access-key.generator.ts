@@ -35,10 +35,11 @@ export function generateAccessKey(params: {
     tipoEmision = "1",
     codigoNumerico,
   } = params;
-
+/*
   if (ruc.length !== 13) {
     throw new Error(`RUC debe tener 13 dígitos (recibido: ${ruc.length})`);
   }
+    */
   if (codigoNumerico.length !== 8) {
     throw new Error(`codigoNumerico debe tener 8 dígitos (recibido: ${codigoNumerico.length})`);
   }

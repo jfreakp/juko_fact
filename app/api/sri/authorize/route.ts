@@ -33,11 +33,18 @@ export async function POST(req: NextRequest) {
       invoice.id
     );
 
+    // Si hay un error en la autorización, incluir el mensaje detallado
+    if (result.estado !== "AUTORIZADO" && result.estado !== "AUTORIZADA" && result.mensaje) {
+      return apiSuccess({
+        ...result,
+        error: result.mensaje, // Incluir mensaje de error explícitamente
+      });
+    }
+
     return apiSuccess(result);
   } catch (err) {
-    return apiError(
-      err instanceof Error ? err.message : "Error autorizando comprobante",
-      500
-    );
+    const message = err instanceof Error ? err.message : "Error autorizando comprobante";
+    console.error("[SRI Authorize Error]", message);
+    return apiError(message, 500);
   }
 }

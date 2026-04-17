@@ -323,24 +323,24 @@ function buildAuthorizationSOAP(claveAcceso: string): string {
 // ─── Response Parsers ─────────────────────────────────────────────────────────
 
 function parseReceptionResponse(xml: string): { estado: string; mensaje?: string; informacion?: string } {
-  const stateMatch = xml.match(/<estado>([^<]+)<\/estado>/);
+  const stateMatch = xml.match(/<estado>\s*([^<]+?)\s*<\/estado>/);
   // Collect all error messages (identificador + mensaje + informacionAdicional)
   const errores: string[] = [];
   const msgRegex = /<mensaje[^>]*>([\s\S]*?)<\/mensaje>/g;
   let m;
   while ((m = msgRegex.exec(xml)) !== null) {
     const block = m[1];
-    const id = block.match(/<identificador>([^<]+)<\/identificador>/)?.[1];
-    const msg = block.match(/<mensaje>([^<]+)<\/mensaje>/)?.[1];
-    const info = block.match(/<informacionAdicional>([^<]+)<\/informacionAdicional>/)?.[1];
-    const tipo = block.match(/<tipo>([^<]+)<\/tipo>/)?.[1];
-    if (msg) errores.push(`[${id ?? "?"}][${tipo ?? "?"}] ${msg}${info ? ` (${info})` : ""}`);
+    const id = block.match(/<identificador>\s*([^<]+?)\s*<\/identificador>/)?.[1];
+    const msg = block.match(/<mensaje>\s*([^<]+?)\s*<\/mensaje>/)?.[1];
+    const info = block.match(/<informacionAdicional>\s*([^<]+?)\s*<\/informacionAdicional>/)?.[1];
+    const tipo = block.match(/<tipo>\s*([^<]+?)\s*<\/tipo>/)?.[1];
+    if (msg) errores.push(`[${id?.trim() ?? "?"}][${tipo?.trim() ?? "?"}] ${msg.trim()}${info ? ` (${info.trim()})` : ""}`);
   }
   // Fallback: simple mensaje tag
-  const simpleMsgMatch = errores.length === 0 ? xml.match(/<mensaje>([^<]+)<\/mensaje>/) : null;
+  const simpleMsgMatch = errores.length === 0 ? xml.match(/<mensaje>\s*([^<]+?)\s*<\/mensaje>/) : null;
   return {
-    estado: stateMatch?.[1] ?? "ERROR",
-    mensaje: errores.length > 0 ? errores.join(" | ") : simpleMsgMatch?.[1],
+    estado: stateMatch?.[1]?.trim() ?? "ERROR",
+    mensaje: errores.length > 0 ? errores.join(" | ") : simpleMsgMatch?.[1]?.trim(),
   };
 }
 
@@ -352,33 +352,36 @@ function parseAuthorizationResponse(xml: string): {
   mensaje?: string;
 } {
   // <numeroComprobantes>0</numeroComprobantes> means SRI hasn't processed it yet
-  const numComprobantesMatch = xml.match(/<numeroComprobantes>([^<]+)<\/numeroComprobantes>/);
-  if (numComprobantesMatch?.[1] === "0") {
+  const numComprobantesMatch = xml.match(/<numeroComprobantes>\s*([^<]+?)\s*<\/numeroComprobantes>/);
+  if (numComprobantesMatch?.[1]?.trim() === "0") {
     return { estado: "EN_PROCESO", mensaje: "El SRI aún no ha procesado el comprobante" };
   }
 
-  const stateMatch = xml.match(/<estado>([^<]+)<\/estado>/);
-  const numMatch = xml.match(/<numeroAutorizacion>([^<]+)<\/numeroAutorizacion>/);
-  const fechaMatch = xml.match(/<fechaAutorizacion>([^<]+)<\/fechaAutorizacion>/);
-  const comprobanteMatch = xml.match(/<comprobante><!\[CDATA\[([\s\S]*?)\]\]><\/comprobante>/);
+  // ── Extract main fields with whitespace tolerance ──
+  const stateMatch = xml.match(/<estado>\s*([^<]+?)\s*<\/estado>/);
+  const numMatch = xml.match(/<numeroAutorizacion>\s*([^<]+?)\s*<\/numeroAutorizacion>/);
+  const fechaMatch = xml.match(/<fechaAutorizacion>\s*([^<]+?)\s*<\/fechaAutorizacion>/);
+  const comprobanteMatch = xml.match(/<comprobante>\s*<!\[CDATA\[([\s\S]*?)\]\]>\s*<\/comprobante>/);
 
-  // Extraer mensajes de error/advertencia del SRI (rechazo, NO_AUTORIZADA, etc.)
+  // ── Extract error/warning messages from SRI (rejection, NO_AUTORIZADO, etc.) ──
   const errores: string[] = [];
   const msgRegex = /<mensaje[^>]*>([\s\S]*?)<\/mensaje>/g;
   let m;
   while ((m = msgRegex.exec(xml)) !== null) {
     const block = m[1];
-    const id = block.match(/<identificador>([^<]+)<\/identificador>/)?.[1];
-    const msg = block.match(/<mensaje>([^<]+)<\/mensaje>/)?.[1];
-    const info = block.match(/<informacionAdicional>([^<]+)<\/informacionAdicional>/)?.[1];
-    const tipo = block.match(/<tipo>([^<]+)<\/tipo>/)?.[1];
-    if (msg) errores.push(`[${id ?? "?"}][${tipo ?? "?"}] ${msg}${info ? ` (${info})` : ""}`);
+    const id = block.match(/<identificador>\s*([^<]+?)\s*<\/identificador>/)?.[1];
+    const msg = block.match(/<mensaje>\s*([^<]+?)\s*<\/mensaje>/)?.[1];
+    const info = block.match(/<informacionAdicional>\s*([^<]+?)\s*<\/informacionAdicional>/)?.[1];
+    const tipo = block.match(/<tipo>\s*([^<]+?)\s*<\/tipo>/)?.[1];
+    if (msg) errores.push(`[${id?.trim() ?? "?"}][${tipo?.trim() ?? "?"}] ${msg.trim()}${info ? ` (${info.trim()})` : ""}`);
   }
 
+  const estado = stateMatch?.[1]?.trim() ?? "NO_AUTORIZADA";
+  
   return {
-    estado: stateMatch?.[1] ?? "NO_AUTORIZADA",
-    numeroAutorizacion: numMatch?.[1],
-    fechaAutorizacion: fechaMatch?.[1] ? new Date(fechaMatch[1]) : undefined,
+    estado,
+    numeroAutorizacion: numMatch?.[1]?.trim(),
+    fechaAutorizacion: fechaMatch?.[1]?.trim() ? new Date(fechaMatch[1].trim()) : undefined,
     xmlAutorizado: comprobanteMatch?.[1],
     mensaje: errores.length > 0 ? errores.join(" | ") : undefined,
   };

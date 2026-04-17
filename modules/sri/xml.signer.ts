@@ -162,7 +162,11 @@ export function signXML(config: XAdESSignatureConfig): string {
     `</ds:Signature>`;
 
   // ── 11. Inject signature before the closing tag of the root element ───────
-  return docBody.replace(/(<\/[^>]+>\s*)$/, `${signatureBlock}\n$1`);
+  // IMPORTANT: Do NOT add a newline before $1. The enveloped-signature
+  // transform removes ds:Signature but leaves surrounding text nodes intact.
+  // An extra \n between </ds:Signature> and </factura> would make the SRI
+  // verifier see a different byte sequence than our stored docDigest.
+  return docBody.replace(/(<\/[^>]+>\s*)$/, `${signatureBlock}$1`);
 }
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────

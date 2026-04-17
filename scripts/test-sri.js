@@ -60,7 +60,7 @@ async function main() {
         descripcion: "Prueba facturacion electronica",
         cantidad: 1,
         precioUnitario: 10.0,
-        tipoIva: "IVA_12",
+        tipoIva: "IVA_15",
       }],
     }
   );

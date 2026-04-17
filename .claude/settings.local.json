@@ -36,7 +36,16 @@
       "Bash(node scripts/test-sri.js)",
       "Bash(node scripts/check-digest.js cmo1ycslh000mxktzra3am6o5)",
       "Bash(node -e \"require\\('xml-crypto'\\); console.log\\('xml-crypto available'\\)\")",
-      "Bash(node -e \"require\\('@xmldom/xmldom'\\); console.log\\('xmldom available'\\)\")"
+      "Bash(node -e \"require\\('@xmldom/xmldom'\\); console.log\\('xmldom available'\\)\")",
+      "Bash(jar tf:*)",
+      "Bash(\"/c/facturador_sri/jre/bin/jar\" tf:*)",
+      "Bash(\"/c/facturador_sri/jre/bin/java\" -version)",
+      "Bash(mkdir -p /tmp/sri_jar)",
+      "Read(//tmp/**)",
+      "Bash(\"/c/facturador_sri/jre/bin/jar.exe\" xf:*)",
+      "Bash(ls \"C:/facturador_sri/jre/bin/\"*.exe)",
+      "Bash(node:*)",
+      "Bash(\"C:/facturador_sri/jre/bin/javap.exe\" -c -p \"C:/Users/jfreakp/AppData/Local/Temp/sri_decompile/FirmaDigital.class\")"
     ]
   }
 }

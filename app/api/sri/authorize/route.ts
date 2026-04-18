@@ -34,10 +34,11 @@ export async function POST(req: NextRequest) {
     );
 
     // Si hay un error en la autorización, incluir el mensaje detallado
-    if (result.estado !== "AUTORIZADO" && result.estado !== "AUTORIZADA" && result.mensaje) {
+    const resultWithMsg = result as typeof result & { mensaje?: string };
+    if (result.estado !== "AUTORIZADO" && result.estado !== "AUTORIZADA" && resultWithMsg.mensaje) {
       return apiSuccess({
         ...result,
-        error: result.mensaje, // Incluir mensaje de error explícitamente
+        error: resultWithMsg.mensaje, // Incluir mensaje de error explícitamente
       });
     }
 

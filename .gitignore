@@ -36,6 +36,9 @@ yarn-error.log*
 # vercel
 .vercel
 
+# Next.js 16 uses proxy.ts — middleware.ts causes a conflict
+middleware.ts
+
 # typescript
 *.tsbuildinfo
 next-env.d.ts

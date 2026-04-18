@@ -1,12 +1,13 @@
 "use client";
 
-import { useEffect, useState, FormEvent } from "react";
+import { useEffect, useState, FormEvent, useRef } from "react";
 import Header from "@/components/layout/Header";
 import Button from "@/components/ui/Button";
 import Input from "@/components/ui/Input";
 import Select from "@/components/ui/Select";
 import Modal from "@/components/ui/Modal";
 import { useToast } from "@/components/ui/Toast";
+import { useCurrentUser } from "@/hooks/useCurrentUser";
 
 interface Client {
   id: string;
@@ -41,8 +42,15 @@ const emptyForm = {
   direccion: "",
 };
 
+interface ImportResult {
+  created: number;
+  updated: number;
+  errors: { row: number; message: string }[];
+}
+
 export default function ClientsPage() {
   const { success, error: toastError } = useToast();
+  const { user } = useCurrentUser();
   const [clients, setClients] = useState<Client[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
@@ -50,6 +58,14 @@ export default function ClientsPage() {
   const [editClient, setEditClient] = useState<Client | null>(null);
   const [form, setForm] = useState(emptyForm);
   const [saving, setSaving] = useState(false);
+
+  // Import state
+  const [importOpen, setImportOpen] = useState(false);
+  const [importFile, setImportFile] = useState<File | null>(null);
+  const [importing, setImporting] = useState(false);
+  const [importResult, setImportResult] = useState<ImportResult | null>(null);
+  const [dragOver, setDragOver] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   async function loadClients() {
     const res = await fetch(`/api/clients?search=${search}`);
@@ -102,6 +118,38 @@ export default function ClientsPage() {
     }
   }
 
+  function openImport() {
+    setImportFile(null);
+    setImportResult(null);
+    setImportOpen(true);
+  }
+
+  function handleFileDrop(e: React.DragEvent) {
+    e.preventDefault();
+    setDragOver(false);
+    const f = e.dataTransfer.files[0];
+    if (f) setImportFile(f);
+  }
+
+  async function handleImport() {
+    if (!importFile) return;
+    setImporting(true);
+    setImportResult(null);
+    try {
+      const fd = new FormData();
+      fd.append("file", importFile);
+      const res = await fetch("/api/clients/import", { method: "POST", body: fd });
+      const data = await res.json();
+      if (!data.success) throw new Error(data.error);
+      setImportResult(data.data);
+      if (data.data.created > 0 || data.data.updated > 0) loadClients();
+    } catch (err) {
+      toastError(err instanceof Error ? err.message : "Error al importar");
+    } finally {
+      setImporting(false);
+    }
+  }
+
   async function handleDelete(id: string) {
     if (!confirm("¿Eliminar este cliente?")) return;
     const res = await fetch(`/api/clients/${id}`, { method: "DELETE" });
@@ -119,7 +167,14 @@ export default function ClientsPage() {
       <Header
         title="Clientes"
         subtitle={`Gestión de ${clients.length} socios comerciales activos`}
-        action={<Button onClick={openCreate}>+ Nuevo Cliente</Button>}
+        action={
+          <div className="flex gap-2">
+            {user?.role === "ADMIN" && (
+              <Button variant="ghost" onClick={openImport}>Importar Excel</Button>
+            )}
+            <Button onClick={openCreate}>+ Nuevo Cliente</Button>
+          </div>
+        }
       />
 
       {/* Search */}
@@ -208,6 +263,118 @@ export default function ClientsPage() {
           </table>
         )}
       </div>
+
+      {/* Import Modal */}
+      <Modal open={importOpen} onClose={() => setImportOpen(false)} title="Importar Clientes desde Excel">
+        <div className="space-y-4">
+          {/* Column reference + template download */}
+          <div
+            className="rounded-lg p-3 text-[11px] font-medium space-y-2"
+            style={{ background: "var(--surface-low)", color: "var(--text-muted)" }}
+          >
+            <div className="flex items-start justify-between gap-4">
+              <div className="space-y-1">
+                <p className="font-bold uppercase tracking-widest" style={{ color: "var(--text-base)" }}>
+                  Columnas esperadas
+                </p>
+                <p>A: Tipo Id. &nbsp;·&nbsp; B: CI/RUC &nbsp;·&nbsp; C: Razón Social &nbsp;·&nbsp; E: Dirección &nbsp;·&nbsp; F: Teléfono &nbsp;·&nbsp; H: Email</p>
+                <p>Los clientes ya existentes (mismo CI/RUC) se omiten sin error.</p>
+              </div>
+              <a
+                href="/api/clients/import"
+                download="plantilla_clientes.xlsx"
+                className="shrink-0 flex items-center gap-1.5 px-3 py-1.5 rounded-lg font-bold text-[11px] uppercase tracking-widest transition-colors"
+                style={{
+                  background: "var(--primary)",
+                  color: "var(--primary-fg, #000)",
+                  textDecoration: "none",
+                }}
+              >
+                <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+                </svg>
+                Plantilla
+              </a>
+            </div>
+          </div>
+
+          {/* Drop zone */}
+          <div
+            onClick={() => fileInputRef.current?.click()}
+            onDragOver={(e) => { e.preventDefault(); setDragOver(true); }}
+            onDragLeave={() => setDragOver(false)}
+            onDrop={handleFileDrop}
+            className="rounded-xl border-2 border-dashed cursor-pointer transition-colors flex flex-col items-center justify-center gap-2 py-8"
+            style={{
+              borderColor: dragOver ? "var(--primary)" : "var(--border)",
+              background: dragOver ? "var(--surface-low)" : "transparent",
+            }}
+          >
+            <svg className="w-8 h-8" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}
+              style={{ color: importFile ? "var(--primary)" : "var(--text-muted)" }}>
+              <path strokeLinecap="round" strokeLinejoin="round"
+                d="M9 13h6m-3-3v6m5 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+            </svg>
+            {importFile ? (
+              <p className="text-sm font-bold" style={{ color: "var(--text-base)" }}>{importFile.name}</p>
+            ) : (
+              <p className="text-sm font-medium" style={{ color: "var(--text-muted)" }}>
+                Arrastra el .xlsx aquí o haz clic para seleccionar
+              </p>
+            )}
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept=".xlsx,.xls"
+              className="hidden"
+              onChange={(e) => { if (e.target.files?.[0]) setImportFile(e.target.files[0]); }}
+            />
+          </div>
+
+          {/* Result */}
+          {importResult && (
+            <div className="rounded-lg p-4 space-y-2" style={{ background: "var(--surface-low)" }}>
+              <div className="flex gap-4 text-sm">
+                <span>
+                  <span className="font-bold" style={{ color: "var(--success-text)" }}>{importResult.created}</span>
+                  <span className="ml-1 font-medium" style={{ color: "var(--text-muted)" }}>nuevos</span>
+                </span>
+                <span>
+                  <span className="font-bold" style={{ color: "var(--info-text)" }}>{importResult.updated}</span>
+                  <span className="ml-1 font-medium" style={{ color: "var(--text-muted)" }}>actualizados</span>
+                </span>
+                {importResult.errors.length > 0 && (
+                  <span>
+                    <span className="font-bold" style={{ color: "var(--danger-text)" }}>{importResult.errors.length}</span>
+                    <span className="ml-1 font-medium" style={{ color: "var(--text-muted)" }}>errores</span>
+                  </span>
+                )}
+              </div>
+              {importResult.errors.length > 0 && (
+                <div className="max-h-28 overflow-y-auto space-y-1">
+                  {importResult.errors.slice(0, 20).map((e) => (
+                    <p key={e.row} className="text-[11px] font-medium" style={{ color: "var(--danger-text)" }}>
+                      {e.message}
+                    </p>
+                  ))}
+                  {importResult.errors.length > 20 && (
+                    <p className="text-[11px]" style={{ color: "var(--text-muted)" }}>
+                      ... y {importResult.errors.length - 20} más
+                    </p>
+                  )}
+                </div>
+              )}
+            </div>
+          )}
+
+          <div className="flex justify-end gap-3 pt-1">
+            <Button variant="ghost" type="button" onClick={() => setImportOpen(false)}>Cerrar</Button>
+            <Button onClick={handleImport} loading={importing} disabled={!importFile}>
+              Importar
+            </Button>
+          </div>
+        </div>
+      </Modal>
 
       {/* Modal */}
       <Modal

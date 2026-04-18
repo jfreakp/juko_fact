@@ -32,7 +32,7 @@ export const invoiceService = {
     return invoice;
   },
 
-  async create(companyId: string, dto: CreateInvoiceDTO) {
+  async create(companyId: string, dto: CreateInvoiceDTO, branchId?: string) {
     const company = await companyRepository.findById(companyId);
     if (!company) throw new Error("Empresa no encontrada");
 
@@ -59,7 +59,8 @@ export const invoiceService = {
       companyId,
       dto.clientId,
       company.ambiente,
-      dto
+      dto,
+      branchId
     );
   },
 

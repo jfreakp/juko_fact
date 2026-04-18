@@ -101,7 +101,8 @@ export const invoiceRepository = {
     companyId: string,
     clientId: string,
     ambiente: "PRUEBAS" | "PRODUCCION",
-    dto: CreateInvoiceDTO
+    dto: CreateInvoiceDTO,
+    branchId?: string
   ) {
     const secuencial = await invoiceRepository.getNextSecuencial(companyId);
 
@@ -151,6 +152,7 @@ export const invoiceRepository = {
         clientId,
         secuencial,
         ambiente,
+        branchId: branchId ?? null,
         fechaEmision: dto.fechaEmision ? new Date(dto.fechaEmision) : new Date(),
         observaciones: dto.observaciones,
         formaPago: dto.formaPago ?? "01",

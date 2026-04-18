@@ -49,7 +49,11 @@
       "Bash(sed -i 's/tipoIva: \"IVA_12\" as const/tipoIva: \"IVA_STANDARD\" as const/g' prisma/seed.ts)",
       "Bash(sed -i 's/tipoIva: \"IVA_12\"/tipoIva: \"IVA_STANDARD\"/g' scripts/test-sri.ts)",
       "Bash(claude mcp:*)",
-      "Bash(ls:*)"
+      "Bash(ls:*)",
+      "Bash(pnpm prisma:*)",
+      "Bash(pnpm tsc:*)",
+      "Bash(pnpm db:reset)",
+      "Bash(PRISMA_USER_CONSENT_FOR_DANGEROUS_AI_ACTION=\"si\" pnpm db:reset)"
     ]
   }
 }

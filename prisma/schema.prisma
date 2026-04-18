@@ -10,7 +10,7 @@ datasource db {
 
 enum Role {
   ADMIN
-  EMISOR
+  EMPLOYED
 }
 
 enum Ambiente {
@@ -58,15 +58,18 @@ model User {
   email     String   @unique
   name      String
   password  String
-  role      Role     @default(EMISOR)
+  role      Role     @default(EMPLOYED)
   active    Boolean  @default(true)
   companyId String?
   company   Company? @relation(fields: [companyId], references: [id])
+  branchId  String?
+  branch    Branch?  @relation(fields: [branchId], references: [id])
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
   @@index([email])
   @@index([companyId])
+  @@index([branchId])
   @@map("users")
 }
 
@@ -99,9 +102,27 @@ model Company {
   clients      Client[]
   products     Product[]
   invoices     Invoice[]
+  branches     Branch[]
 
   @@index([ruc])
   @@map("companies")
+}
+
+model Branch {
+  id        String   @id @default(cuid())
+  companyId String
+  company   Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  nombre    String
+  direccion String?
+  active    Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  users    User[]
+  invoices Invoice[]
+
+  @@index([companyId])
+  @@map("branches")
 }
 
 model Certificate {
@@ -184,6 +205,10 @@ model Invoice {
   totalIva            Decimal           @default(0) @db.Decimal(12, 2)
   propina             Decimal           @default(0) @db.Decimal(12, 2)
   importeTotal        Decimal           @default(0) @db.Decimal(12, 2)
+
+  // Sucursal emisora
+  branchId            String?
+  branch              Branch?           @relation(fields: [branchId], references: [id], onDelete: SetNull)
 
   // Pago
   formaPago           String            @default("01") // Tabla 24: 01=efectivo, 17=transferencia, 19=tarjeta crédito

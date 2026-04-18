@@ -1,6 +1,7 @@
 import type {
   User,
   Company,
+  Branch,
   Client,
   Product,
   Invoice,
@@ -13,6 +14,7 @@ import type {
 export type {
   User,
   Company,
+  Branch,
   Client,
   Product,
   Invoice,
@@ -32,8 +34,29 @@ export type CreateUserDTO = {
   email: string;
   name: string;
   password: string;
-  role?: "ADMIN" | "EMISOR";
+  role?: "ADMIN" | "EMPLOYED";
   companyId?: string;
+  branchId?: string;
+};
+
+export type UpdateUserDTO = {
+  name?: string;
+  email?: string;
+  role?: "ADMIN" | "EMPLOYED";
+  branchId?: string | null;
+  active?: boolean;
+  password?: string;
+};
+
+export type CreateBranchDTO = {
+  nombre: string;
+  direccion?: string;
+};
+
+export type UpdateBranchDTO = {
+  nombre?: string;
+  direccion?: string;
+  active?: boolean;
 };
 
 export type UpdateCompanyDTO = {

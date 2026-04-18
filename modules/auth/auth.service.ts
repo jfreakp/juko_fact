@@ -20,6 +20,7 @@ export const authService = {
       email: user.email,
       role: user.role,
       companyId: user.companyId,
+      branchId: user.branchId ?? null,
     };
 
     const token = signToken(payload);
@@ -53,6 +54,7 @@ export const authService = {
       name: user.name,
       role: user.role,
       companyId: user.companyId,
+      branchId: user.branchId ?? null,
       company: user.company
         ? {
             id: user.company.id,
@@ -60,6 +62,9 @@ export const authService = {
             razonSocial: user.company.razonSocial,
             ambiente: user.company.ambiente,
           }
+        : null,
+      branch: user.branch
+        ? { id: user.branch.id, nombre: user.branch.nombre }
         : null,
     };
   },

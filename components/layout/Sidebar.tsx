@@ -2,8 +2,9 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { useCurrentUser } from "@/hooks/useCurrentUser";
 
-const navItems = [
+const baseNavItems = [
   {
     href: "/",
     label: "Dashboard",
@@ -15,6 +16,7 @@ const navItems = [
         <rect x="14" y="14" width="7" height="7" rx="1" />
       </svg>
     ),
+    adminOnly: false,
   },
   {
     href: "/invoices",
@@ -25,6 +27,7 @@ const navItems = [
           d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
       </svg>
     ),
+    adminOnly: false,
   },
   {
     href: "/clients",
@@ -35,6 +38,7 @@ const navItems = [
           d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z" />
       </svg>
     ),
+    adminOnly: false,
   },
   {
     href: "/products",
@@ -45,6 +49,7 @@ const navItems = [
           d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" />
       </svg>
     ),
+    adminOnly: false,
   },
   {
     href: "/company",
@@ -55,11 +60,38 @@ const navItems = [
           d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
       </svg>
     ),
+    adminOnly: true,
+  },
+  {
+    href: "/branches",
+    label: "Sucursales",
+    icon: (
+      <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+        <path strokeLinecap="round" strokeLinejoin="round"
+          d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" />
+      </svg>
+    ),
+    adminOnly: true,
+  },
+  {
+    href: "/users",
+    label: "Usuarios",
+    icon: (
+      <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+        <path strokeLinecap="round" strokeLinejoin="round"
+          d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z" />
+      </svg>
+    ),
+    adminOnly: true,
   },
 ];
 
 export default function Sidebar() {
   const pathname = usePathname();
+  const { user } = useCurrentUser();
+  const isAdmin = user?.role === "ADMIN";
+
+  const navItems = baseNavItems.filter((item) => !item.adminOnly || isAdmin);
 
   async function handleLogout() {
     await fetch("/api/auth/logout", { method: "POST" });
@@ -100,6 +132,43 @@ export default function Sidebar() {
         </div>
       </div>
 
+      {/* User badge */}
+      {user && (
+        <div className="px-4 mb-4">
+          <div
+            className="px-3 py-2 rounded-lg"
+            style={{ background: "var(--surface-highest)" }}
+          >
+            <p
+              className="text-[9px] font-bold tracking-[0.15em] uppercase truncate"
+              style={{ color: "var(--text-muted)" }}
+            >
+              {user.name}
+            </p>
+            <div className="flex items-center gap-1.5 mt-0.5">
+              <span
+                className="text-[9px] font-bold tracking-widest uppercase px-1.5 py-0.5 rounded"
+                style={
+                  isAdmin
+                    ? { background: "var(--primary)", color: "var(--on-primary)" }
+                    : { background: "var(--surface-mid)", color: "var(--text-muted)" }
+                }
+              >
+                {isAdmin ? "Admin" : "Empleado"}
+              </span>
+              {user.branch && (
+                <span
+                  className="text-[9px] truncate"
+                  style={{ color: "var(--text-muted)" }}
+                >
+                  {user.branch.nombre}
+                </span>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Nav */}
       <nav className="flex-1 px-3">
         <p
@@ -120,13 +189,8 @@ export default function Sidebar() {
                 className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-xs font-bold tracking-widest uppercase transition-colors"
                 style={
                   active
-                    ? {
-                        background: "var(--primary)",
-                        color: "var(--on-primary)",
-                      }
-                    : {
-                        color: "var(--text-secondary)",
-                      }
+                    ? { background: "var(--primary)", color: "var(--on-primary)" }
+                    : { color: "var(--text-secondary)" }
                 }
                 onMouseEnter={(e) => {
                   if (!active) {

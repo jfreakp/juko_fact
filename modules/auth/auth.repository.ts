@@ -2,9 +2,10 @@ import { prisma } from "@/lib/prisma";
 import type { User } from "@prisma/client";
 
 export const authRepository = {
-  async findByEmail(email: string): Promise<User | null> {
+  async findByEmail(email: string) {
     return prisma.user.findUnique({
       where: { email: email.toLowerCase().trim() },
+      include: { branch: { select: { id: true } } },
     });
   },
 
@@ -15,7 +16,10 @@ export const authRepository = {
   async findByIdWithCompany(id: string) {
     return prisma.user.findUnique({
       where: { id },
-      include: { company: true },
+      include: {
+        company: true,
+        branch: { select: { id: true, nombre: true } },
+      },
     });
   },
 
@@ -23,8 +27,9 @@ export const authRepository = {
     email: string;
     name: string;
     password: string;
-    role?: "ADMIN" | "EMISOR";
+    role?: "ADMIN" | "EMPLOYED";
     companyId?: string;
+    branchId?: string;
   }): Promise<User> {
     return prisma.user.create({
       data: {

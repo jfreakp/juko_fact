@@ -53,7 +53,11 @@ export async function POST(req: NextRequest) {
     const parsed = invoiceSchema.safeParse(body);
     if (!parsed.success) return apiError(parsed.error.issues[0].message);
 
-    const invoice = await invoiceService.create(auth.payload.companyId, parsed.data);
+    const invoice = await invoiceService.create(
+      auth.payload.companyId,
+      parsed.data,
+      auth.payload.branchId ?? undefined
+    );
     return apiSuccess(invoice, 201);
   } catch (err) {
     return apiError(err instanceof Error ? err.message : "Error al crear factura");

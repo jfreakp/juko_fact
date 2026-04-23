@@ -2,6 +2,8 @@
 
 import Link from "next/link";
 
+const APP_NAME = process.env.NEXT_PUBLIC_APP_NAME ?? "{APP_NAME}";
+
 export default function LandingPage() {
   return (
     <div style={{ fontFamily: "var(--font-manrope, 'Manrope', sans-serif)", background: "#ffffff", color: "#1c1b1b" }} className="antialiased">
@@ -19,7 +21,7 @@ export default function LandingPage() {
                   d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
               </svg>
             </div>
-            <span className="text-xl font-black tracking-tight" style={{ color: "#111827" }}>JUKO_FACT</span>
+            <span className="text-xl font-black tracking-tight" style={{ color: "#111827" }}>{APP_NAME}</span>
           </div>
 
           <nav className="hidden md:flex items-center gap-8">
@@ -81,7 +83,7 @@ export default function LandingPage() {
               </h1>
 
               <p className="text-xl leading-relaxed max-w-xl" style={{ color: "#4b5563" }}>
-                JUKO_FACT integra su negocio directamente con el SRI. Olvide la complejidad técnica y concéntrese en crecer. Emisión inmediata, seguridad y soporte experto.
+                {APP_NAME} integra su negocio directamente con el SRI. Olvide la complejidad técnica y concéntrese en crecer. Emisión inmediata, seguridad y soporte experto.
               </p>
 
               <div className="flex flex-wrap gap-4">
@@ -394,7 +396,7 @@ export default function LandingPage() {
                   d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
               </svg>
             </div>
-            <span className="font-black tracking-tight uppercase text-lg" style={{ color: "#111827" }}>JUKO_FACT</span>
+            <span className="font-black tracking-tight uppercase text-lg" style={{ color: "#111827" }}>{APP_NAME}</span>
           </div>
 
           <div className="flex gap-8">
@@ -411,7 +413,7 @@ export default function LandingPage() {
           </div>
 
           <p className="font-medium text-center md:text-right" style={{ color: "#9ca3af" }}>
-            © 2025 JUKO_FACT. Sistema SRI Ecuador Autorizado.
+            © 2025 {APP_NAME}. Sistema SRI Ecuador Autorizado.
           </p>
         </div>
       </footer>

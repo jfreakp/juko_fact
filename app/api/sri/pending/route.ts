@@ -1,3 +1,5 @@
+export const dynamic = "force-dynamic";
+
 import { NextRequest } from "next/server";
 import { invoiceRepository } from "@/modules/invoices/invoice.repository";
 import { sriService } from "@/modules/sri/sri.service";

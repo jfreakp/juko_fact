@@ -216,6 +216,98 @@ export const invoiceRepository = {
     });
   },
 
+  /** Versión de create que acepta un cliente de transacción externo */
+  async createWithTx(
+    tx: Prisma.TransactionClient,
+    companyId: string,
+    clientId: string,
+    ambiente: "PRUEBAS" | "PRODUCCION",
+    dto: CreateInvoiceDTO,
+    branchId?: string
+  ) {
+    // Calcular secuencial dentro de la transacción
+    const [last, company] = await Promise.all([
+      tx.invoice.findFirst({
+        where: { companyId },
+        orderBy: { secuencial: "desc" },
+        select: { secuencial: true },
+      }),
+      tx.company.findUnique({
+        where: { id: companyId },
+        select: { secuencialInicio: true },
+      }),
+    ]);
+
+    const inicio = company?.secuencialInicio ?? 1;
+    const lastNum = last ? parseInt(last.secuencial, 10) : 0;
+    const next = Math.max(lastNum + 1, inicio);
+    const secuencial = next.toString().padStart(9, "0");
+
+    let subtotal0 = 0, subtotal12 = 0, subtotal5 = 0, subtotal15 = 0,
+        subtotalNoIva = 0, totalDescuento = 0, totalIva = 0;
+
+    const detailsData = dto.details.map((d, i) => {
+      const { precioTotalSinImpuesto, valorIva } = calcDetailTotals(d);
+      totalDescuento += d.descuento ?? 0;
+      totalIva += valorIva;
+      if (d.tipoIva === "IVA_0") subtotal0 += precioTotalSinImpuesto;
+      else if (d.tipoIva === "IVA_STANDARD") subtotal15 += precioTotalSinImpuesto;
+      else if (d.tipoIva === "IVA_5") subtotal5 += precioTotalSinImpuesto;
+      else subtotalNoIva += precioTotalSinImpuesto;
+      return {
+        productId: d.productId,
+        codigoPrincipal: d.codigoPrincipal,
+        codigoAuxiliar: d.codigoAuxiliar,
+        descripcion: d.descripcion,
+        cantidad: d.cantidad,
+        precioUnitario: d.precioUnitario,
+        descuento: d.descuento ?? 0,
+        precioTotalSinImpuesto,
+        tipoIva: d.tipoIva,
+        valorIva,
+        orden: i,
+      };
+    });
+
+    const importeTotal =
+      Math.round((subtotal0 + subtotal5 + subtotal15 + subtotalNoIva + totalIva) * 100) / 100;
+
+    return tx.invoice.create({
+      data: {
+        companyId,
+        clientId,
+        secuencial,
+        ambiente,
+        branchId: branchId ?? null,
+        fechaEmision: dto.fechaEmision ? new Date(dto.fechaEmision) : new Date(),
+        observaciones: dto.observaciones,
+        formaPago: dto.formaPago ?? "01",
+        montoPagado: dto.montoPagado,
+        vuelto: dto.vuelto,
+        subtotal0, subtotal12, subtotal5, subtotal15,
+        subtotalNoIva, totalDescuento, totalIva, importeTotal,
+        details: { create: detailsData },
+      },
+      include: {
+        company: true,
+        client: true,
+        details: { include: { product: true } },
+      },
+    });
+  },
+
+  /** Versión de anular que acepta un cliente de transacción externo */
+  async anularWithTx(tx: Prisma.TransactionClient, id: string, motivo?: string) {
+    return tx.invoice.update({
+      where: { id },
+      data: {
+        estado: "ANULADO" as never,
+        motivoAnulacion: motivo ?? null,
+        fechaAnulacion: new Date(),
+      },
+    });
+  },
+
   async addSRIResponse(
     invoiceId: string,
     data: {

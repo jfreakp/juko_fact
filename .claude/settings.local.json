@@ -54,7 +54,9 @@
       "Bash(pnpm tsc:*)",
       "Bash(pnpm db:reset)",
       "Bash(PRISMA_USER_CONSENT_FOR_DANGEROUS_AI_ACTION=\"si\" pnpm db:reset)",
-      "Bash(grep -r \"proxy\\\\|middleware\" next.config*ç)"
+      "Bash(grep -r \"proxy\\\\|middleware\" next.config*ç)",
+      "Bash(pnpm exec:*)",
+      "Bash(npx next:*)"
     ]
   }
 }

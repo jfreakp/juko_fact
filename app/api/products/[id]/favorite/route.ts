@@ -1,3 +1,5 @@
+export const dynamic = "force-dynamic";
+
 import { NextRequest } from "next/server";
 import { z } from "zod";
 import { productService } from "@/modules/products/product.service";

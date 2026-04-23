@@ -1,3 +1,5 @@
+export const dynamic = "force-dynamic";
+
 import { NextRequest } from "next/server";
 import { invoiceService } from "@/modules/invoices/invoice.service";
 import { requireAuth, apiSuccess, apiError } from "@/lib/api";
@@ -16,7 +18,7 @@ export async function POST(
     typeof body.motivo === "string" && body.motivo.trim() ? body.motivo.trim() : undefined;
 
   try {
-    await invoiceService.anular(id, auth.payload.companyId, motivo);
+    await invoiceService.anular(id, auth.payload.companyId, motivo, auth.payload.userId);
     return apiSuccess({ message: "Factura anulada correctamente" });
   } catch (err) {
     return apiError(err instanceof Error ? err.message : "Error al anular", 400);

@@ -1,3 +1,5 @@
+export const dynamic = "force-dynamic";
+
 import { NextRequest } from "next/server";
 import { z } from "zod";
 import { companyService } from "@/modules/company/company.service";
@@ -15,6 +17,17 @@ const updateSchema = z.object({
   ambiente: z.enum(["PRUEBAS", "PRODUCCION"]).optional(),
   tipoEmision: z.enum(["NORMAL", "INDISPONIBILIDAD"]).optional(),
   secuencialInicio: z.number().int().min(1).optional(),
+  businessType: z
+    .enum([
+      "GENERAL",
+      "PHARMACY",
+      "LIQUOR_STORE",
+      "GROCERY",
+      "RESTAURANT",
+      "CLOTHING_STORE",
+      "HARDWARE_STORE",
+    ])
+    .optional(),
 });
 
 export async function GET(req: NextRequest) {

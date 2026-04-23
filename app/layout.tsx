@@ -8,8 +8,10 @@ const manrope = Manrope({
   weight: ["300", "400", "500", "600", "700", "800"],
 });
 
+const APP_NAME = process.env.NEXT_PUBLIC_APP_NAME ?? "JUKO_FACT";
+
 export const metadata: Metadata = {
-  title: "JUKO_FACT — Facturación Electrónica SRI",
+  title: `${APP_NAME} — Facturación Electrónica SRI`,
   description: "Sistema de Facturación Electrónica según normativa SRI Ecuador",
 };
 

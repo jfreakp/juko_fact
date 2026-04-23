@@ -2,8 +2,8 @@ import { productRepository } from "./product.repository";
 import type { CreateProductDTO } from "@/types";
 
 export const productService = {
-  async getAll(companyId: string, search?: string) {
-    return productRepository.findAll(companyId, search);
+  async getAll(companyId: string, search?: string, barcode?: string) {
+    return productRepository.findAll(companyId, search, barcode);
   },
 
   async getById(id: string, companyId: string) {

@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useCurrentUser } from "@/hooks/useCurrentUser";
+import { useBusinessType } from "@/lib/business-context";
 
 const baseNavItems = [
   {
@@ -52,6 +53,17 @@ const baseNavItems = [
     adminOnly: false,
   },
   {
+    href: "/inventory",
+    label: "Inventario",
+    icon: (
+      <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+        <path strokeLinecap="round" strokeLinejoin="round"
+          d="M5 8h14M5 8a2 2 0 110-4h14a2 2 0 110 4M5 8v10a2 2 0 002 2h10a2 2 0 002-2V8m-9 4h4" />
+      </svg>
+    ),
+    adminOnly: false,
+  },
+  {
     href: "/company",
     label: "Empresa",
     icon: (
@@ -86,12 +98,20 @@ const baseNavItems = [
   },
 ];
 
+const APP_NAME = process.env.NEXT_PUBLIC_APP_NAME ?? "{APP_NAME}";
+
 export default function Sidebar() {
   const pathname = usePathname();
   const { user } = useCurrentUser();
+  const { config } = useBusinessType();
   const isAdmin = user?.role === "ADMIN";
 
-  const navItems = baseNavItems.filter((item) => !item.adminOnly || isAdmin);
+  const navItems = baseNavItems.filter((item) => {
+    if (item.adminOnly && !isAdmin) return false;
+    // Hide inventory link when the business type doesn't use it
+    if (item.href === "/inventory" && !config.modules.inventory) return false;
+    return true;
+  });
 
   async function handleLogout() {
     await fetch("/api/auth/logout", { method: "POST" });
@@ -120,7 +140,7 @@ export default function Sidebar() {
               className="text-sm font-black tracking-tight leading-none"
               style={{ color: "var(--text-base)" }}
             >
-              JUKO_FACT
+              {APP_NAME}
             </p>
             <p
               className="text-[10px] font-medium tracking-widest uppercase leading-tight mt-0.5"

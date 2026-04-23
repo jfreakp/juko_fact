@@ -1,3 +1,5 @@
+export const dynamic = "force-dynamic";
+
 import { NextRequest } from "next/server";
 import { z } from "zod";
 import { invoiceService } from "@/modules/invoices/invoice.service";
@@ -56,7 +58,8 @@ export async function POST(req: NextRequest) {
     const invoice = await invoiceService.create(
       auth.payload.companyId,
       parsed.data,
-      auth.payload.branchId ?? undefined
+      auth.payload.branchId ?? undefined,
+      auth.payload.userId
     );
     return apiSuccess(invoice, 201);
   } catch (err) {

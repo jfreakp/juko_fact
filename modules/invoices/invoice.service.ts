@@ -1,6 +1,8 @@
 import { invoiceRepository } from "./invoice.repository";
 import { companyRepository } from "@/modules/company/company.repository";
 import { clientRepository } from "@/modules/clients/client.repository";
+import { validateStock, deductFromInvoice, revertFromInvoice } from "@/modules/inventory/stock.service";
+import { prisma } from "@/lib/prisma";
 import type { CreateInvoiceDTO, CreateInvoiceDetailDTO } from "@/types";
 import { IVA_RATES } from "@/types";
 
@@ -9,13 +11,13 @@ function round2(n: number) {
 }
 
 function calcImporteTotal(details: CreateInvoiceDetailDTO[]): number {
-  let total = 0;
+  let totalCents = 0;
   for (const d of details) {
     const subtotal = round2(d.cantidad * d.precioUnitario - (d.descuento ?? 0));
     const iva = round2((subtotal * (IVA_RATES[d.tipoIva] ?? 0)) / 100);
-    total += subtotal + iva;
+    totalCents += Math.round((subtotal + iva) * 100);
   }
-  return round2(total);
+  return totalCents / 100;
 }
 
 export const invoiceService = {
@@ -32,7 +34,7 @@ export const invoiceService = {
     return invoice;
   },
 
-  async create(companyId: string, dto: CreateInvoiceDTO, branchId?: string) {
+  async create(companyId: string, dto: CreateInvoiceDTO, branchId?: string, userId?: string) {
     const company = await companyRepository.findById(companyId);
     if (!company) throw new Error("Empresa no encontrada");
 
@@ -41,6 +43,27 @@ export const invoiceService = {
 
     if (!dto.details || dto.details.length === 0) {
       throw new Error("La factura debe tener al menos un detalle");
+    }
+
+    // E-02: Validar que ningún descuento exceda el subtotal de esa línea
+    for (const d of dto.details) {
+      const subtotal = d.cantidad * d.precioUnitario;
+      if ((d.descuento ?? 0) > subtotal) {
+        throw new Error(
+          `Descuento ($${d.descuento}) no puede exceder el subtotal de línea ($${round2(subtotal)}) en "${d.descripcion}"`
+        );
+      }
+    }
+
+    // E-03: Validar que la fecha de emisión no sea futura
+    if (dto.fechaEmision) {
+      const emision = new Date(dto.fechaEmision);
+      const mañana = new Date();
+      mañana.setDate(mañana.getDate() + 1);
+      mañana.setHours(0, 0, 0, 0);
+      if (emision >= mañana) {
+        throw new Error("La fecha de emisión no puede ser una fecha futura");
+      }
     }
 
     // Validar pago si se proporcionó montoPagado
@@ -55,35 +78,92 @@ export const invoiceService = {
       dto.vuelto = round2(mp - importeTotal);
     }
 
-    return invoiceRepository.create(
-      companyId,
-      dto.clientId,
-      company.ambiente,
-      dto,
-      branchId
-    );
+    // Validar stock disponible antes de crear (fuera de tx para mejor mensaje de error)
+    if (branchId) {
+      const stockItems = dto.details
+        .filter((d) => d.productId)
+        .map((d) => ({ productId: d.productId!, cantidad: d.cantidad }));
+
+      if (stockItems.length > 0) {
+        const check = await validateStock(companyId, branchId, stockItems);
+        if (!check.ok) {
+          throw new Error(`Stock insuficiente:\n${check.errors.join("\n")}`);
+        }
+      }
+    }
+
+    // Sin integración de stock (sin branchId o sin userId): flujo original
+    if (!branchId || !userId) {
+      return invoiceRepository.create(companyId, dto.clientId, company.ambiente, dto, branchId);
+    }
+
+    // Con stock: todo en una transacción
+    return prisma.$transaction(async (tx) => {
+      const invoice = await invoiceRepository.createWithTx(
+        tx, companyId, dto.clientId, company.ambiente, dto, branchId
+      );
+
+      for (const detail of dto.details) {
+        if (!detail.productId) continue;
+        await deductFromInvoice({
+          companyId,
+          branchId,
+          productId: detail.productId,
+          cantidad: detail.cantidad,
+          referencia: invoice.secuencial,
+          referenciaId: invoice.id,
+          userId,
+          tx,
+        });
+      }
+
+      return invoice;
+    });
   },
 
-  async anular(id: string, companyId: string, motivo?: string) {
+  async anular(id: string, companyId: string, motivo?: string, userId?: string) {
     const invoice = await invoiceRepository.findById(id, companyId);
     if (!invoice) throw new Error("Factura no encontrada");
     if (invoice.estado === "ANULADO") throw new Error("La factura ya está anulada");
-    return invoiceRepository.anular(id, motivo);
+
+    // F-02: Un comprobante autorizado por el SRI no puede anularse localmente.
+    // El contribuyente debe emitir una Nota de Crédito para reversar el efecto fiscal.
+    if (invoice.estado === "AUTORIZADO") {
+      throw new Error(
+        "No se puede anular un comprobante ya autorizado por el SRI. " +
+        "Emita una Nota de Crédito para reversar esta factura."
+      );
+    }
+
+    // Sin integración de stock
+    if (!invoice.branchId || !userId) {
+      return invoiceRepository.anular(id, motivo);
+    }
+
+    // Con stock: revertir movimientos en la misma transacción
+    return prisma.$transaction(async (tx) => {
+      const anulada = await invoiceRepository.anularWithTx(tx, id, motivo);
+
+      for (const detail of invoice.details) {
+        if (!detail.productId) continue;
+        await revertFromInvoice({
+          companyId,
+          branchId: invoice.branchId!,
+          productId: detail.productId,
+          cantidad: Number(detail.cantidad),
+          referencia: invoice.secuencial,
+          referenciaId: invoice.id,
+          userId,
+          tx,
+        });
+      }
+
+      return anulada;
+    });
   },
 
+  // P-02: Delegado al repositorio con groupBy — 1 query en lugar de 4.
   async getStats(companyId: string) {
-    const [total, pendientes, autorizadas, rechazadas] = await Promise.all([
-      invoiceRepository.findAll(companyId, { limit: 1 }),
-      invoiceRepository.findAll(companyId, { estado: "PENDIENTE", limit: 1 }),
-      invoiceRepository.findAll(companyId, { estado: "AUTORIZADO", limit: 1 }),
-      invoiceRepository.findAll(companyId, { estado: "RECHAZADO", limit: 1 }),
-    ]);
-
-    return {
-      total: total.total,
-      pendientes: pendientes.total,
-      autorizadas: autorizadas.total,
-      rechazadas: rechazadas.total,
-    };
+    return invoiceRepository.getStats(companyId);
   },
 };

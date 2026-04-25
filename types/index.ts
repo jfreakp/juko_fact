@@ -72,6 +72,14 @@ export type UpdateCompanyDTO = {
   tipoEmision?: "NORMAL" | "INDISPONIBILIDAD";
   logoUrl?: string | null;
   secuencialInicio?: number;
+  businessType?:
+    | "GENERAL"
+    | "PHARMACY"
+    | "LIQUOR_STORE"
+    | "GROCERY"
+    | "RESTAURANT"
+    | "CLOTHING_STORE"
+    | "HARDWARE_STORE";
 };
 
 export type CreateClientDTO = {
@@ -83,6 +91,21 @@ export type CreateClientDTO = {
   telefono?: string;
 };
 
+// Extra per-business-type fields stored as JSON in the metadata column.
+export type ProductMetadata = {
+  // Pharmacy / Grocery
+  lote?: string;
+  fechaVencimiento?: string; // ISO date
+  // Pharmacy
+  registroSanitario?: string;
+  requiereReceta?: boolean;
+  principioActivo?: string;
+  // Liquor
+  gradosAlcohol?: number;
+  volumenMl?: number;
+  paisOrigen?: string;
+};
+
 export type CreateProductDTO = {
   codigoPrincipal: string;
   codigoAuxiliar?: string;
@@ -90,6 +113,9 @@ export type CreateProductDTO = {
   precio: number;
   tipoIva: "IVA_0" | "IVA_5" | "IVA_STANDARD" | "NO_APLICA";
   tipo: "BIEN" | "SERVICIO";
+  codigoBarras?: string;
+  unidadMedida?: "UNIDAD" | "KG" | "LITRO" | "METRO" | "M2" | "CAJA";
+  metadata?: ProductMetadata;
 };
 
 export type CreateInvoiceDetailDTO = {
@@ -121,6 +147,7 @@ export interface InvoiceForXML {
   invoice: Invoice & {
     company: Company;
     client: Client;
+    branch?: Branch | null; // F-05: Dirección de sucursal emisora
     details: (InvoiceDetail & { product?: Product | null })[];
   };
 }

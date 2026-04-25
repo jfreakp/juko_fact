@@ -4,9 +4,11 @@ import { useState, FormEvent } from "react";
 import Input from "@/components/ui/Input";
 import Button from "@/components/ui/Button";
 
+const APP_NAME = process.env.NEXT_PUBLIC_APP_NAME ?? "{APP_NAME}";
+
 export default function LoginPage() {
-  const [email, setEmail] = useState("admin@techsoluciones.com");
-  const [password, setPassword] = useState("admin123");
+  const [email, setEmail] = useState("admin@factura.test");
+  const [password, setPassword] = useState("Admin1234!");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
 
@@ -56,7 +58,7 @@ export default function LoginPage() {
             </svg>
           </div>
           <span className="text-base font-black tracking-tight" style={{ color: "var(--on-primary)" }}>
-            JUKO_FACT
+            {APP_NAME}
           </span>
         </div>
 
@@ -107,7 +109,7 @@ export default function LoginPage() {
                   d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
               </svg>
             </div>
-            <span className="text-sm font-black tracking-tight" style={{ color: "var(--text-base)" }}>JUKO_FACT</span>
+            <span className="text-sm font-black tracking-tight" style={{ color: "var(--text-base)" }}>{APP_NAME}</span>
           </div>
 
           <h2 className="text-3xl font-black tracking-tight mb-1" style={{ color: "var(--text-base)" }}>
@@ -161,7 +163,7 @@ export default function LoginPage() {
 
           <p className="text-center text-[10px] font-medium mt-8 leading-relaxed" style={{ color: "var(--text-muted)" }}>
             Solo personal autorizado. Todos los datos son registrados y monitoreados.
-            <br />JUKO_FACT Sistema de Facturación Industrial © 2025
+            <br />{APP_NAME} Sistema de Facturación Industrial © 2025
           </p>
         </div>
       </div>

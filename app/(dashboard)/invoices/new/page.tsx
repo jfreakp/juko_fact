@@ -23,6 +23,8 @@ interface Product {
   precio: number;
   tipoIva: string;
   isFavorite: boolean;
+  codigoBarras: string | null;
+  unidadMedida: string;
 }
 
 interface DetailLine {
@@ -374,11 +376,14 @@ function ProductPicker({ products, selected, onSelect, onClear }: ProductPickerP
   useEffect(() => { setMounted(true); }, []);
 
   const filtered = query
-    ? products.filter(
-        (p) =>
-          p.descripcion.toLowerCase().includes(query.toLowerCase()) ||
-          p.codigoPrincipal.toLowerCase().includes(query.toLowerCase())
-      )
+    ? products.filter((p) => {
+        const q = query.toLowerCase();
+        return (
+          p.descripcion.toLowerCase().includes(q) ||
+          p.codigoPrincipal.toLowerCase().includes(q) ||
+          (p.codigoBarras?.toLowerCase().includes(q) ?? false)
+        );
+      })
     : products;
 
   function calcDropdownPosition() {

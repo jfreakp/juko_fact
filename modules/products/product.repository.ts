@@ -2,16 +2,19 @@ import { prisma } from "@/lib/prisma";
 import type { CreateProductDTO } from "@/types";
 
 export const productRepository = {
-  async findAll(companyId: string, search?: string) {
+  async findAll(companyId: string, search?: string, barcode?: string) {
     return prisma.product.findMany({
       where: {
         companyId,
         active: true,
-        ...(search
+        ...(barcode
+          ? { codigoBarras: barcode }
+          : search
           ? {
               OR: [
                 { descripcion: { contains: search, mode: "insensitive" } },
                 { codigoPrincipal: { contains: search, mode: "insensitive" } },
+                { codigoBarras: { contains: search, mode: "insensitive" } },
               ],
             }
           : {}),
@@ -36,12 +39,16 @@ export const productRepository = {
         companyId,
         ...data,
         precio: data.precio,
+        metadata: data.metadata as never,
       },
     });
   },
 
   async update(id: string, companyId: string, data: Partial<CreateProductDTO>) {
-    return prisma.product.updateMany({ where: { id, companyId }, data });
+    return prisma.product.updateMany({
+      where: { id, companyId },
+      data: { ...data, metadata: data.metadata as never },
+    });
   },
 
   async softDelete(id: string, companyId: string) {

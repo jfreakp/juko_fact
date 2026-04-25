@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useCurrentUser } from "@/hooks/useCurrentUser";
+import { useBusinessType } from "@/lib/business-context";
 
 const baseNavItems = [
   {
@@ -52,6 +53,39 @@ const baseNavItems = [
     adminOnly: false,
   },
   {
+    href: "/inventory",
+    label: "Inventario",
+    icon: (
+      <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+        <path strokeLinecap="round" strokeLinejoin="round"
+          d="M5 8h14M5 8a2 2 0 110-4h14a2 2 0 110 4M5 8v10a2 2 0 002 2h10a2 2 0 002-2V8m-9 4h4" />
+      </svg>
+    ),
+    adminOnly: false,
+  },
+  {
+    href: "/purchases",
+    label: "Compras",
+    icon: (
+      <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+        <path strokeLinecap="round" strokeLinejoin="round"
+          d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 11-4 0 2 2 0 014 0z" />
+      </svg>
+    ),
+    adminOnly: false,
+  },
+  {
+    href: "/reports",
+    label: "Reportes",
+    icon: (
+      <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+        <path strokeLinecap="round" strokeLinejoin="round"
+          d="M3 13.125C3 12.504 3.504 12 4.125 12h2.25c.621 0 1.125.504 1.125 1.125v6.75C7.5 20.496 6.996 21 6.375 21h-2.25A1.125 1.125 0 013 19.875v-6.75zM9.75 8.625c0-.621.504-1.125 1.125-1.125h2.25c.621 0 1.125.504 1.125 1.125v11.25c0 .621-.504 1.125-1.125 1.125h-2.25a1.125 1.125 0 01-1.125-1.125V8.625zM16.5 4.125c0-.621.504-1.125 1.125-1.125h2.25C20.496 3 21 3.504 21 4.125v15.75c0 .621-.504 1.125-1.125 1.125h-2.25a1.125 1.125 0 01-1.125-1.125V4.125z" />
+      </svg>
+    ),
+    adminOnly: false,
+  },
+  {
     href: "/company",
     label: "Empresa",
     icon: (
@@ -86,25 +120,27 @@ const baseNavItems = [
   },
 ];
 
+const APP_NAME = process.env.NEXT_PUBLIC_APP_NAME ?? "{APP_NAME}";
+
 export default function Sidebar() {
   const pathname = usePathname();
   const { user } = useCurrentUser();
+  const { config } = useBusinessType();
   const isAdmin = user?.role === "ADMIN";
 
-  const navItems = baseNavItems.filter((item) => !item.adminOnly || isAdmin);
-
-  async function handleLogout() {
-    await fetch("/api/auth/logout", { method: "POST" });
-    window.location.href = "/";
-  }
+  const navItems = baseNavItems.filter((item) => {
+    if (item.adminOnly && !isAdmin) return false;
+    if (item.href === "/inventory" && !config.modules.inventory) return false;
+    return true;
+  });
 
   return (
     <aside
-      className="w-64 min-h-screen flex flex-col"
-      style={{ background: "var(--surface-low)" }}
+      className="w-64 flex flex-col flex-shrink-0"
+      style={{ background: "var(--surface-low)", borderRight: "1px solid var(--surface-highest)" }}
     >
       {/* Logo */}
-      <div className="px-6 pt-8 pb-6">
+      <div className="px-6 pt-7 pb-6">
         <div className="flex items-center gap-3">
           <div
             className="w-9 h-9 rounded-lg flex items-center justify-center flex-shrink-0"
@@ -116,71 +152,27 @@ export default function Sidebar() {
             </svg>
           </div>
           <div>
-            <p
-              className="text-sm font-black tracking-tight leading-none"
-              style={{ color: "var(--text-base)" }}
-            >
-              JUKO_FACT
+            <p className="text-sm font-black tracking-tight leading-none" style={{ color: "var(--text-base)" }}>
+              {APP_NAME}
             </p>
-            <p
-              className="text-[10px] font-medium tracking-widest uppercase leading-tight mt-0.5"
-              style={{ color: "var(--text-muted)" }}
-            >
+            <p className="text-[10px] font-medium tracking-widest uppercase leading-tight mt-0.5" style={{ color: "var(--text-muted)" }}>
               Enterprise Ledger
             </p>
           </div>
         </div>
       </div>
 
-      {/* User badge */}
-      {user && (
-        <div className="px-4 mb-4">
-          <div
-            className="px-3 py-2 rounded-lg"
-            style={{ background: "var(--surface-highest)" }}
-          >
-            <p
-              className="text-[9px] font-bold tracking-[0.15em] uppercase truncate"
-              style={{ color: "var(--text-muted)" }}
-            >
-              {user.name}
-            </p>
-            <div className="flex items-center gap-1.5 mt-0.5">
-              <span
-                className="text-[9px] font-bold tracking-widest uppercase px-1.5 py-0.5 rounded"
-                style={
-                  isAdmin
-                    ? { background: "var(--primary)", color: "var(--on-primary)" }
-                    : { background: "var(--surface-mid)", color: "var(--text-muted)" }
-                }
-              >
-                {isAdmin ? "Admin" : "Empleado"}
-              </span>
-              {user.branch && (
-                <span
-                  className="text-[9px] truncate"
-                  style={{ color: "var(--text-muted)" }}
-                >
-                  {user.branch.nombre}
-                </span>
-              )}
-            </div>
-          </div>
-        </div>
-      )}
-
       {/* Nav */}
-      <nav className="flex-1 px-3">
-        <p
-          className="px-3 mb-2 text-[9px] font-bold tracking-[0.15em] uppercase"
-          style={{ color: "var(--text-muted)" }}
-        >
+      <nav className="flex-1 px-3 overflow-y-auto">
+        <p className="px-3 mb-2 text-[9px] font-bold tracking-[0.15em] uppercase" style={{ color: "var(--text-muted)" }}>
           Menú
         </p>
         <div className="space-y-0.5">
           {navItems.map((item) => {
             const active =
-              item.href === "/dashboard" ? pathname === "/dashboard" : pathname.startsWith(item.href);
+              item.href === "/dashboard"
+                ? pathname === "/dashboard"
+                : pathname.startsWith(item.href);
 
             return (
               <Link
@@ -193,14 +185,10 @@ export default function Sidebar() {
                     : { color: "var(--text-secondary)" }
                 }
                 onMouseEnter={(e) => {
-                  if (!active) {
-                    (e.currentTarget as HTMLElement).style.background = "var(--surface-high)";
-                  }
+                  if (!active) (e.currentTarget as HTMLElement).style.background = "var(--surface-high)";
                 }}
                 onMouseLeave={(e) => {
-                  if (!active) {
-                    (e.currentTarget as HTMLElement).style.background = "transparent";
-                  }
+                  if (!active) (e.currentTarget as HTMLElement).style.background = "transparent";
                 }}
               >
                 {item.icon}
@@ -212,7 +200,7 @@ export default function Sidebar() {
       </nav>
 
       {/* Create Invoice CTA */}
-      <div className="px-4 py-4">
+      <div className="px-4 py-4" style={{ borderTop: "1px solid var(--surface-highest)" }}>
         <Link
           href="/invoices/new"
           className="flex items-center justify-center gap-2 w-full py-2.5 rounded-lg text-xs font-bold tracking-widest uppercase transition-colors"
@@ -223,32 +211,6 @@ export default function Sidebar() {
           </svg>
           Crear Factura
         </Link>
-      </div>
-
-      {/* Footer */}
-      <div
-        className="px-3 py-4 space-y-0.5"
-        style={{ borderTop: "1px solid var(--surface-highest)" }}
-      >
-        <button
-          onClick={handleLogout}
-          className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-xs font-bold tracking-widest uppercase transition-colors w-full"
-          style={{ color: "var(--text-muted)" }}
-          onMouseEnter={(e) => {
-            (e.currentTarget as HTMLElement).style.background = "var(--surface-high)";
-            (e.currentTarget as HTMLElement).style.color = "var(--text-base)";
-          }}
-          onMouseLeave={(e) => {
-            (e.currentTarget as HTMLElement).style.background = "transparent";
-            (e.currentTarget as HTMLElement).style.color = "var(--text-muted)";
-          }}
-        >
-          <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-            <path strokeLinecap="round" strokeLinejoin="round"
-              d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
-          </svg>
-          Cerrar sesión
-        </button>
       </div>
     </aside>
   );

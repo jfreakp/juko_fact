@@ -1,7 +1,20 @@
+export const dynamic = "force-dynamic";
+
 import { NextRequest } from "next/server";
 import { z } from "zod";
 import { productService } from "@/modules/products/product.service";
 import { requireAuth, apiSuccess, apiError } from "@/lib/api";
+
+const metadataSchema = z.object({
+  lote: z.string().optional(),
+  fechaVencimiento: z.string().optional(),
+  registroSanitario: z.string().optional(),
+  requiereReceta: z.boolean().optional(),
+  principioActivo: z.string().optional(),
+  gradosAlcohol: z.number().optional(),
+  volumenMl: z.number().optional(),
+  paisOrigen: z.string().optional(),
+}).optional();
 
 const updateSchema = z.object({
   codigoPrincipal: z.string().min(1).optional(),
@@ -10,6 +23,9 @@ const updateSchema = z.object({
   precio: z.number().positive().optional(),
   tipoIva: z.enum(["IVA_0", "IVA_5", "IVA_STANDARD", "NO_APLICA"]).optional(),
   tipo: z.enum(["BIEN", "SERVICIO"]).optional(),
+  codigoBarras: z.string().optional(),
+  unidadMedida: z.enum(["UNIDAD", "KG", "LITRO", "METRO", "M2", "CAJA"]).optional(),
+  metadata: metadataSchema,
 });
 
 export async function GET(

@@ -1,7 +1,19 @@
 import jwt from "jsonwebtoken";
 import { cookies } from "next/headers";
 
-const JWT_SECRET = process.env.JWT_SECRET || "change-me-in-production";
+const JWT_SECRET_DEFAULT = "change-me-in-production";
+const _rawSecret = process.env.JWT_SECRET;
+
+// S-01: Forzar JWT_SECRET real en producción. Un secret conocido públicamente
+// permite forjar tokens válidos para cualquier usuario/empresa.
+if (process.env.NODE_ENV === "production" && (!_rawSecret || _rawSecret === JWT_SECRET_DEFAULT)) {
+  throw new Error(
+    "FATAL: JWT_SECRET no está configurado o usa el valor por defecto. " +
+    "Establece JWT_SECRET en las variables de entorno antes de iniciar en producción."
+  );
+}
+
+const JWT_SECRET = _rawSecret ?? JWT_SECRET_DEFAULT;
 const COOKIE_NAME = "auth_token";
 const EXPIRES_IN = "8h";
 

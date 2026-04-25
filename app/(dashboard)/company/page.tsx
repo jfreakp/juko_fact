@@ -7,6 +7,8 @@ import Input from "@/components/ui/Input";
 import Select from "@/components/ui/Select";
 import Badge from "@/components/ui/Badge";
 import { useToast } from "@/components/ui/Toast";
+import { useBusinessType } from "@/lib/business-context";
+import { BUSINESS_TYPE_OPTIONS } from "@/lib/business-config";
 
 interface Certificate {
   id: string;
@@ -31,6 +33,7 @@ interface CompanyData {
   tipoEmision: string;
   logoUrl: string | null;
   secuencialInicio: number;
+  businessType: string;
   certificates: Certificate[];
 }
 
@@ -46,6 +49,7 @@ const TIPO_EMISION_OPTIONS = [
 
 export default function CompanyPage() {
   const { success, error: toastError } = useToast();
+  const { refresh: refreshBusinessType } = useBusinessType();
   const [company, setCompany] = useState<CompanyData | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -61,6 +65,7 @@ export default function CompanyPage() {
     ambiente: "PRUEBAS",
     tipoEmision: "NORMAL",
     secuencialInicio: 1,
+    businessType: "GENERAL",
   });
 
   const [certFile, setCertFile] = useState<File | null>(null);
@@ -90,6 +95,7 @@ export default function CompanyPage() {
         ambiente: c.ambiente ?? "PRUEBAS",
         tipoEmision: c.tipoEmision ?? "NORMAL",
         secuencialInicio: c.secuencialInicio ?? 1,
+        businessType: c.businessType ?? "GENERAL",
       });
     }
     setLoading(false);
@@ -146,6 +152,7 @@ export default function CompanyPage() {
       const data = await res.json();
       if (!data.success) throw new Error(data.error);
       success("Datos de empresa actualizados");
+      refreshBusinessType();
       load();
     } catch (err) {
       toastError(err instanceof Error ? err.message : "Error al guardar");
@@ -298,6 +305,30 @@ export default function CompanyPage() {
                 style={{ color: "var(--text-muted)" }}
               >
                 Número desde el que inicia la serie de comprobantes. Solo aplica antes de emitir la primera factura.
+              </p>
+            </div>
+
+            <div
+              className="pt-4"
+              style={{ borderTop: "1px solid var(--surface-highest)" }}
+            >
+              <p
+                className="text-[10px] font-bold tracking-[0.15em] uppercase mb-3"
+                style={{ color: "var(--text-muted)" }}
+              >
+                Tipo de Negocio
+              </p>
+              <Select
+                label="Giro del negocio"
+                options={BUSINESS_TYPE_OPTIONS}
+                value={form.businessType}
+                onChange={(e) => setForm({ ...form, businessType: e.target.value })}
+              />
+              <p
+                className="text-[10px] mt-1.5"
+                style={{ color: "var(--text-muted)" }}
+              >
+                Define qué campos, módulos y validaciones están activos en el sistema.
               </p>
             </div>
 

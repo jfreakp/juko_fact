@@ -1,7 +1,20 @@
+export const dynamic = "force-dynamic";
+
 import { NextRequest } from "next/server";
 import { z } from "zod";
 import { productService } from "@/modules/products/product.service";
 import { requireAuth, apiSuccess, apiError } from "@/lib/api";
+
+const metadataSchema = z.object({
+  lote: z.string().optional(),
+  fechaVencimiento: z.string().optional(),
+  registroSanitario: z.string().optional(),
+  requiereReceta: z.boolean().optional(),
+  principioActivo: z.string().optional(),
+  gradosAlcohol: z.number().optional(),
+  volumenMl: z.number().optional(),
+  paisOrigen: z.string().optional(),
+}).optional();
 
 const productSchema = z.object({
   codigoPrincipal: z.string().min(1, "Código principal requerido"),
@@ -10,6 +23,9 @@ const productSchema = z.object({
   precio: z.number().positive("Precio debe ser positivo"),
   tipoIva: z.enum(["IVA_0", "IVA_5", "IVA_STANDARD", "NO_APLICA"]),
   tipo: z.enum(["BIEN", "SERVICIO"]),
+  codigoBarras: z.string().optional(),
+  unidadMedida: z.enum(["UNIDAD", "KG", "LITRO", "METRO", "M2", "CAJA"]).optional(),
+  metadata: metadataSchema,
 });
 
 export async function GET(req: NextRequest) {
@@ -18,7 +34,8 @@ export async function GET(req: NextRequest) {
   if (!auth.payload.companyId) return apiError("Sin empresa asignada", 400);
 
   const search = req.nextUrl.searchParams.get("search") ?? undefined;
-  const products = await productService.getAll(auth.payload.companyId, search);
+  const barcode = req.nextUrl.searchParams.get("barcode") ?? undefined;
+  const products = await productService.getAll(auth.payload.companyId, search, barcode);
   return apiSuccess(products);
 }
 

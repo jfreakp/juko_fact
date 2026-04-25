@@ -83,4 +83,21 @@ export const companyRepository = {
     // Return the value BEFORE increment (subtract 1), zero-padded to 8 digits
     return (updated.codigoNumericoSiguiente - 1).toString().padStart(8, "0");
   },
+
+  /**
+   * F-03: Incrementa atómicamente y devuelve el siguiente número secuencial de factura.
+   * Usa UPDATE + increment de Prisma para evitar colisiones en concurrencia.
+   * Nota: si la factura posterior falla y se revierte su tx, el número se "pierde"
+   * (gap en la secuencia). Esto es aceptable — los gaps no son ilegales en Ecuador.
+   */
+  async getNextSecuencial(companyId: string): Promise<string> {
+    const updated = await prisma.company.update({
+      where: { id: companyId },
+      data: { secuencialSiguiente: { increment: 1 } },
+      select: { secuencialSiguiente: true },
+    });
+    // El valor devuelto ya es el nuevo (post-increment).
+    // Queremos el valor ANTES del increment → restamos 1.
+    return (updated.secuencialSiguiente - 1).toString().padStart(9, "0");
+  },
 };

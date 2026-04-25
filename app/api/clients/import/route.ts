@@ -1,3 +1,5 @@
+export const dynamic = "force-dynamic";
+
 import * as XLSX from "xlsx";
 import { NextRequest } from "next/server";
 import { clientService } from "@/modules/clients/client.service";

@@ -54,7 +54,14 @@
       "Bash(pnpm tsc:*)",
       "Bash(pnpm db:reset)",
       "Bash(PRISMA_USER_CONSENT_FOR_DANGEROUS_AI_ACTION=\"si\" pnpm db:reset)",
-      "Bash(grep -r \"proxy\\\\|middleware\" next.config*ç)"
+      "Bash(grep -r \"proxy\\\\|middleware\" next.config*ç)",
+      "Bash(pnpm exec:*)",
+      "Bash(npx next:*)",
+      "Bash(mkdir -p /c/Users/jfreakp/Documents/work/juko_fact_app/app/api/suppliers/\\\\[id\\\\])",
+      "Bash(mkdir -p /c/Users/jfreakp/Documents/work/juko_fact_app/app/api/purchases/\\\\[id\\\\])",
+      "Bash(cat app/api/invoices/[id]/pdf/route.ts)",
+      "Bash(npm run:*)",
+      "Bash(git add:*)"
     ]
   }
 }

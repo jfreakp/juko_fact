@@ -1,6 +1,7 @@
 import { create } from "xmlbuilder2";
 import type { InvoiceForXML } from "@/types";
 import { IVA_RATES, IVA_CODIGO_PORCENTAJE, TIPO_IDENTIFICACION_CODIGO } from "@/types";
+import { formatEcuadorDate } from "@/lib/ecuador-date";
 
 /**
  * Builds a factura XML following the SRI Ecuador v2.1.0 schema.
@@ -8,10 +9,20 @@ import { IVA_RATES, IVA_CODIGO_PORCENTAJE, TIPO_IDENTIFICACION_CODIGO } from "@/
  */
 export function buildInvoiceXML(data: InvoiceForXML): string {
   const { invoice } = data;
-  const { company, client, details } = invoice;
+  const { company, client, branch, details } = invoice;
 
-  const fechaEmision = formatDate(invoice.fechaEmision);
+  // F-04: Formatear fecha en hora local Ecuador (UTC-5), no en UTC.
+  const fechaEmision = formatEcuadorDate(invoice.fechaEmision);
   const ambienteCode = invoice.ambiente === "PRODUCCION" ? "2" : "1";
+
+  // F-07: El SRI exige identificacion = "9999999999999" para Consumidor Final.
+  const identificacionComprador =
+    client.tipoIdentif === "CONSUMIDOR_FINAL"
+      ? "9999999999999"
+      : client.identificacion;
+
+  // F-05: Usar dirección de la sucursal emisora si existe; si no, la de la matriz.
+  const dirEstablecimiento = branch?.direccion ?? company.dirMatriz;
 
   const root = create({ version: "1.0", encoding: "UTF-8" })
     .ele("factura", { id: "comprobante", version: "2.1.0" });
@@ -33,7 +44,6 @@ export function buildInvoiceXML(data: InvoiceForXML): string {
   infoTrib.ele("ptoEmi").txt(company.ptoEmi);
   infoTrib.ele("secuencial").txt(invoice.secuencial);
   infoTrib.ele("dirMatriz").txt(company.dirMatriz);
-  // contribuyenteEspecial va en infoTributaria (v2.1.0), no en infoFactura
   if (company.contribuyenteEsp) {
     infoTrib.ele("contribuyenteEspecial").txt(company.contribuyenteEsp);
   }
@@ -41,7 +51,9 @@ export function buildInvoiceXML(data: InvoiceForXML): string {
   // ── infoFactura ───────────────────────────────────────────────────────────
   const infoFact = root.ele("infoFactura");
   infoFact.ele("fechaEmision").txt(fechaEmision);
-  infoFact.ele("dirEstablecimiento").txt(company.dirMatriz);
+
+  // F-05: Dirección del establecimiento emisor, no siempre la matriz.
+  infoFact.ele("dirEstablecimiento").txt(dirEstablecimiento);
 
   infoFact
     .ele("obligadoContabilidad")
@@ -51,7 +63,10 @@ export function buildInvoiceXML(data: InvoiceForXML): string {
     .ele("tipoIdentificacionComprador")
     .txt(TIPO_IDENTIFICACION_CODIGO[client.tipoIdentif] ?? "05");
   infoFact.ele("razonSocialComprador").txt(client.razonSocial);
-  infoFact.ele("identificacionComprador").txt(client.identificacion);
+
+  // F-07: Identificación normalizada para Consumidor Final.
+  infoFact.ele("identificacionComprador").txt(identificacionComprador);
+
   if (client.direccion) {
     infoFact.ele("direccionComprador").txt(client.direccion);
   }
@@ -99,8 +114,6 @@ export function buildInvoiceXML(data: InvoiceForXML): string {
   infoFact.ele("moneda").txt("DOLAR");
 
   // ── pagos ─────────────────────────────────────────────────────────────────
-  // Obligatorio según ficha técnica SRI (Tabla 24).
-  // formaPago "01" = sin utilización del sistema financiero (contado/efectivo)
   const pagosEl = infoFact.ele("pagos");
   const pagoEl = pagosEl.ele("pago");
   pagoEl.ele("formaPago").txt((invoice as { formaPago?: string }).formaPago ?? "01");
@@ -176,13 +189,6 @@ function addTotalImpuesto(
   ti.ele("codigoPorcentaje").txt(codigoPorcentaje);
   ti.ele("baseImponible").txt(fmt(Number(baseImponible)));
   ti.ele("valor").txt(fmt(valor));
-}
-
-function formatDate(date: Date): string {
-  const d = date.getDate().toString().padStart(2, "0");
-  const m = (date.getMonth() + 1).toString().padStart(2, "0");
-  const y = date.getFullYear().toString();
-  return `${d}/${m}/${y}`;
 }
 
 function fmt(n: number): string {

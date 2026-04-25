@@ -1,7 +1,24 @@
 import { prisma } from "@/lib/prisma";
+import { companyRepository } from "@/modules/company/company.repository";
+import { parseEcuadorDate, todayEcuadorString } from "@/lib/ecuador-date";
 import type { CreateInvoiceDTO, CreateInvoiceDetailDTO } from "@/types";
 import { IVA_RATES } from "@/types";
 import type { Prisma } from "@prisma/client";
+
+// ─── Helpers aritméticos ──────────────────────────────────────────────────────
+
+/**
+ * D-01: Acumula céntimos como enteros para evitar errores de punto flotante.
+ * Ejemplo: 0.10 + 0.20 en JS = 0.30000000000000004.
+ *          (10 + 20) / 100   = 0.30  ✓
+ */
+function toCents(n: number): number {
+  return Math.round(n * 100);
+}
+
+function fromCents(cents: number): number {
+  return cents / 100;
+}
 
 function calcDetailTotals(detail: CreateInvoiceDetailDTO) {
   const cantidad = detail.cantidad;
@@ -14,6 +31,79 @@ function calcDetailTotals(detail: CreateInvoiceDetailDTO) {
     Math.round(((precioTotalSinImpuesto * rate) / 100) * 100) / 100;
   return { precioTotalSinImpuesto, valorIva };
 }
+
+// ─── Cálculo de totales de cabecera (céntimos para evitar float drift) ────────
+
+interface InvoiceTotals {
+  subtotal0: number;
+  subtotal12: number;
+  subtotal5: number;
+  subtotal15: number;
+  subtotalNoIva: number;
+  totalDescuento: number;
+  totalIva: number;
+  importeTotal: number;
+}
+
+function calcTotals(
+  details: CreateInvoiceDetailDTO[],
+  detailsData: ReturnType<typeof buildDetailsData>
+): InvoiceTotals {
+  // Usar céntimos para evitar acumulación de error de punto flotante
+  let subtotal0 = 0,
+    subtotal5 = 0,
+    subtotal15 = 0,
+    subtotalNoIva = 0,
+    totalDescuento = 0,
+    totalIva = 0;
+
+  details.forEach((d, i) => {
+    const { precioTotalSinImpuesto, valorIva } = detailsData[i];
+    totalDescuento += toCents(d.descuento ?? 0);
+    totalIva += toCents(valorIva);
+
+    if (d.tipoIva === "IVA_0") subtotal0 += toCents(precioTotalSinImpuesto);
+    else if (d.tipoIva === "IVA_STANDARD") subtotal15 += toCents(precioTotalSinImpuesto);
+    else if (d.tipoIva === "IVA_5") subtotal5 += toCents(precioTotalSinImpuesto);
+    else subtotalNoIva += toCents(precioTotalSinImpuesto);
+  });
+
+  const importeTotal = subtotal0 + subtotal5 + subtotal15 + subtotalNoIva + totalIva;
+
+  return {
+    subtotal0:    fromCents(subtotal0),
+    subtotal12:   0, // Tasa histórica 12% — no aplica desde 2024
+    subtotal5:    fromCents(subtotal5),
+    subtotal15:   fromCents(subtotal15),
+    subtotalNoIva: fromCents(subtotalNoIva),
+    totalDescuento: fromCents(totalDescuento),
+    totalIva:     fromCents(totalIva),
+    importeTotal: fromCents(importeTotal),
+  };
+}
+
+// ─── Builder de líneas de detalle ─────────────────────────────────────────────
+
+function buildDetailsData(dto: CreateInvoiceDTO) {
+  return dto.details.map((d, i) => {
+    const { precioTotalSinImpuesto, valorIva } = calcDetailTotals(d);
+    return {
+      productId: d.productId,
+      codigoPrincipal: d.codigoPrincipal,
+      codigoAuxiliar: d.codigoAuxiliar,
+      descripcion: d.descripcion,
+      cantidad: d.cantidad,
+      precioUnitario: d.precioUnitario,
+      descuento: d.descuento ?? 0,
+      precioTotalSinImpuesto,
+      tipoIva: d.tipoIva,
+      valorIva,
+      orden: i,
+    };
+  });
+}
+
+// ─── Repositorio ──────────────────────────────────────────────────────────────
 
 export const invoiceRepository = {
   async findAll(
@@ -50,10 +140,9 @@ export const invoiceRepository = {
     const [items, total] = await prisma.$transaction([
       prisma.invoice.findMany({
         where,
-        include: {
-          client: true,
-          details: true,
-        },
+        // P-03: No incluir details en el listado — carga innecesaria de datos.
+        // Los detalles solo se cargan en findById (vista de detalle).
+        include: { client: true },
         orderBy: { createdAt: "desc" },
         skip,
         take: limit,
@@ -70,31 +159,45 @@ export const invoiceRepository = {
       include: {
         company: true,
         client: true,
+        branch: true,
         details: { include: { product: true }, orderBy: { orden: "asc" } },
         sriResponses: { orderBy: { createdAt: "desc" } },
       },
     });
   },
 
-  async getNextSecuencial(companyId: string): Promise<string> {
-    const [last, company] = await Promise.all([
-      prisma.invoice.findFirst({
-        where: { companyId },
-        orderBy: { secuencial: "desc" },
-        select: { secuencial: true },
-      }),
-      prisma.company.findUnique({
-        where: { id: companyId },
-        select: { secuencialInicio: true },
-      }),
-    ]);
+  /**
+   * P-02: Stats en una sola query con groupBy en lugar de 4 COUNT separados.
+   */
+  async getStats(companyId: string) {
+    const counts = await prisma.invoice.groupBy({
+      by: ["estado"],
+      where: { companyId },
+      _count: { id: true },
+    });
 
-    const inicio = company?.secuencialInicio ?? 1;
-    const lastNum = last ? parseInt(last.secuencial, 10) : 0;
-    // secuencialInicio actúa como piso mínimo:
-    // si ya hay facturas, continúa desde el último pero nunca por debajo de secuencialInicio.
-    const next = Math.max(lastNum + 1, inicio);
-    return next.toString().padStart(9, "0");
+    const map: Record<string, number> = {};
+    let total = 0;
+    for (const c of counts) {
+      map[c.estado] = c._count.id;
+      total += c._count.id;
+    }
+
+    return {
+      total,
+      pendientes: map["PENDIENTE"] ?? 0,
+      autorizadas: map["AUTORIZADO"] ?? 0,
+      rechazadas: map["RECHAZADO"] ?? 0,
+      anuladas: map["ANULADO"] ?? 0,
+    };
+  },
+
+  /**
+   * F-03: Usa el contador atómico de company para evitar duplicados en concurrencia.
+   * @deprecated Llama a companyRepository.getNextSecuencial directamente.
+   */
+  async getNextSecuencial(companyId: string): Promise<string> {
+    return companyRepository.getNextSecuencial(companyId);
   },
 
   async create(
@@ -104,47 +207,16 @@ export const invoiceRepository = {
     dto: CreateInvoiceDTO,
     branchId?: string
   ) {
-    const secuencial = await invoiceRepository.getNextSecuencial(companyId);
+    // F-03: Obtiene el secuencial atómicamente (fuera de la tx para evitar deadlocks).
+    const secuencial = await companyRepository.getNextSecuencial(companyId);
 
-    // Calculate totals
-    let subtotal0 = 0,
-      subtotal12 = 0,
-      subtotal5 = 0,
-      subtotal15 = 0,
-      subtotalNoIva = 0,
-      totalDescuento = 0,
-      totalIva = 0;
+    const detailsData = buildDetailsData(dto);
+    const totals = calcTotals(dto.details, detailsData);
 
-    const detailsData = dto.details.map((d, i) => {
-      const { precioTotalSinImpuesto, valorIva } = calcDetailTotals(d);
-      totalDescuento += d.descuento ?? 0;
-      totalIva += valorIva;
-
-      if (d.tipoIva === "IVA_0") subtotal0 += precioTotalSinImpuesto;
-      else if (d.tipoIva === "IVA_STANDARD") subtotal15 += precioTotalSinImpuesto;
-      else if (d.tipoIva === "IVA_5") subtotal5 += precioTotalSinImpuesto;
-      else subtotalNoIva += precioTotalSinImpuesto;
-
-      return {
-        productId: d.productId,
-        codigoPrincipal: d.codigoPrincipal,
-        codigoAuxiliar: d.codigoAuxiliar,
-        descripcion: d.descripcion,
-        cantidad: d.cantidad,
-        precioUnitario: d.precioUnitario,
-        descuento: d.descuento ?? 0,
-        precioTotalSinImpuesto,
-        tipoIva: d.tipoIva,
-        valorIva,
-        orden: i,
-      };
-    });
-
-    const importeTotal =
-      Math.round(
-        (subtotal0 + subtotal5 + subtotal15 + subtotalNoIva + totalIva) *
-          100
-      ) / 100;
+    // F-04: Interpretar fecha del cliente como hora Ecuador.
+    const fechaEmision = dto.fechaEmision
+      ? parseEcuadorDate(dto.fechaEmision)
+      : parseEcuadorDate(todayEcuadorString());
 
     return prisma.invoice.create({
       data: {
@@ -153,24 +225,18 @@ export const invoiceRepository = {
         secuencial,
         ambiente,
         branchId: branchId ?? null,
-        fechaEmision: dto.fechaEmision ? new Date(dto.fechaEmision) : new Date(),
+        fechaEmision,
         observaciones: dto.observaciones,
         formaPago: dto.formaPago ?? "01",
         montoPagado: dto.montoPagado,
         vuelto: dto.vuelto,
-        subtotal0,
-        subtotal12,
-        subtotal5,
-        subtotal15,
-        subtotalNoIva,
-        totalDescuento,
-        totalIva,
-        importeTotal,
+        ...totals,
         details: { create: detailsData },
       },
       include: {
         company: true,
         client: true,
+        branch: true,
         details: { include: { product: true } },
       },
     });
@@ -188,12 +254,11 @@ export const invoiceRepository = {
       fechaAutorizacion?: Date;
     }
   ) {
-    // Uses update (not updateMany) since invoice id is globally unique (cuid).
-    // The companyId check is enforced at service layer via findById before calling this.
+    // S-05: id de factura es globalmente único (cuid). La verificación de companyId
+    // se realiza en la capa de servicio antes de llamar este método.
     return prisma.invoice.update({ where: { id }, data: data as never });
   },
 
-  /** Returns invoices that need to be sent or re-sent to the SRI */
   async findPendingSRI(companyId: string) {
     return prisma.invoice.findMany({
       where: {
@@ -216,7 +281,11 @@ export const invoiceRepository = {
     });
   },
 
-  /** Versión de create que acepta un cliente de transacción externo */
+  /**
+   * Versión de create que acepta un cliente de transacción externo.
+   * F-03: El secuencial se obtiene fuera de la tx (increment atómico no se revierte
+   * si la tx falla — gaps en la secuencia son aceptables, duplicados no).
+   */
   async createWithTx(
     tx: Prisma.TransactionClient,
     companyId: string,
@@ -225,52 +294,16 @@ export const invoiceRepository = {
     dto: CreateInvoiceDTO,
     branchId?: string
   ) {
-    // Calcular secuencial dentro de la transacción
-    const [last, company] = await Promise.all([
-      tx.invoice.findFirst({
-        where: { companyId },
-        orderBy: { secuencial: "desc" },
-        select: { secuencial: true },
-      }),
-      tx.company.findUnique({
-        where: { id: companyId },
-        select: { secuencialInicio: true },
-      }),
-    ]);
+    // F-03: Usar el contador atómico (fuera de la tx intencionalmente).
+    const secuencial = await companyRepository.getNextSecuencial(companyId);
 
-    const inicio = company?.secuencialInicio ?? 1;
-    const lastNum = last ? parseInt(last.secuencial, 10) : 0;
-    const next = Math.max(lastNum + 1, inicio);
-    const secuencial = next.toString().padStart(9, "0");
+    const detailsData = buildDetailsData(dto);
+    const totals = calcTotals(dto.details, detailsData);
 
-    let subtotal0 = 0, subtotal12 = 0, subtotal5 = 0, subtotal15 = 0,
-        subtotalNoIva = 0, totalDescuento = 0, totalIva = 0;
-
-    const detailsData = dto.details.map((d, i) => {
-      const { precioTotalSinImpuesto, valorIva } = calcDetailTotals(d);
-      totalDescuento += d.descuento ?? 0;
-      totalIva += valorIva;
-      if (d.tipoIva === "IVA_0") subtotal0 += precioTotalSinImpuesto;
-      else if (d.tipoIva === "IVA_STANDARD") subtotal15 += precioTotalSinImpuesto;
-      else if (d.tipoIva === "IVA_5") subtotal5 += precioTotalSinImpuesto;
-      else subtotalNoIva += precioTotalSinImpuesto;
-      return {
-        productId: d.productId,
-        codigoPrincipal: d.codigoPrincipal,
-        codigoAuxiliar: d.codigoAuxiliar,
-        descripcion: d.descripcion,
-        cantidad: d.cantidad,
-        precioUnitario: d.precioUnitario,
-        descuento: d.descuento ?? 0,
-        precioTotalSinImpuesto,
-        tipoIva: d.tipoIva,
-        valorIva,
-        orden: i,
-      };
-    });
-
-    const importeTotal =
-      Math.round((subtotal0 + subtotal5 + subtotal15 + subtotalNoIva + totalIva) * 100) / 100;
+    // F-04: Interpretar fecha del cliente como hora Ecuador.
+    const fechaEmision = dto.fechaEmision
+      ? parseEcuadorDate(dto.fechaEmision)
+      : parseEcuadorDate(todayEcuadorString());
 
     return tx.invoice.create({
       data: {
@@ -279,24 +312,23 @@ export const invoiceRepository = {
         secuencial,
         ambiente,
         branchId: branchId ?? null,
-        fechaEmision: dto.fechaEmision ? new Date(dto.fechaEmision) : new Date(),
+        fechaEmision,
         observaciones: dto.observaciones,
         formaPago: dto.formaPago ?? "01",
         montoPagado: dto.montoPagado,
         vuelto: dto.vuelto,
-        subtotal0, subtotal12, subtotal5, subtotal15,
-        subtotalNoIva, totalDescuento, totalIva, importeTotal,
+        ...totals,
         details: { create: detailsData },
       },
       include: {
         company: true,
         client: true,
+        branch: true,
         details: { include: { product: true } },
       },
     });
   },
 
-  /** Versión de anular que acepta un cliente de transacción externo */
   async anularWithTx(tx: Prisma.TransactionClient, id: string, motivo?: string) {
     return tx.invoice.update({
       where: { id },

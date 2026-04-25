@@ -147,6 +147,7 @@ export interface InvoiceForXML {
   invoice: Invoice & {
     company: Company;
     client: Client;
+    branch?: Branch | null; // F-05: Dirección de sucursal emisora
     details: (InvoiceDetail & { product?: Product | null })[];
   };
 }

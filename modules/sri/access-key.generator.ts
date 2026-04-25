@@ -12,6 +12,9 @@
  *  [48]     tipoEmision     Tabla 2   (1 digit)  — 1=NORMAL, 2=INDISPONIBILIDAD
  *  [49]     digitoVerificador módulo 11 (1 digit)
  */
+
+import { toEcuadorDateParts } from "@/lib/ecuador-date";
+
 export function generateAccessKey(params: {
   fechaEmision: Date;
   tipoComprobante?: string;
@@ -35,11 +38,23 @@ export function generateAccessKey(params: {
     tipoEmision = "1",
     codigoNumerico,
   } = params;
-/*
+
+  // F-01: Validar RUC — debe tener exactamente 13 dígitos.
+  // Un RUC inválido genera una clave de acceso rechazada por el SRI sin mensaje claro.
   if (ruc.length !== 13) {
-    throw new Error(`RUC debe tener 13 dígitos (recibido: ${ruc.length})`);
+    throw new Error(
+      `RUC inválido: debe tener 13 dígitos (recibido: "${ruc}", longitud: ${ruc.length}). ` +
+      "Verifique la configuración de la empresa."
+    );
   }
-    */
+
+  if (!/^\d{13}$/.test(ruc)) {
+    throw new Error(
+      `RUC inválido: debe contener solo dígitos (recibido: "${ruc}"). ` +
+      "Verifique la configuración de la empresa."
+    );
+  }
+
   if (codigoNumerico.length !== 8) {
     throw new Error(`codigoNumerico debe tener 8 dígitos (recibido: ${codigoNumerico.length})`);
   }
@@ -47,15 +62,16 @@ export function generateAccessKey(params: {
     throw new Error(`tipoEmision debe ser "1" (NORMAL) o "2" (INDISPONIBILIDAD), recibido: "${tipoEmision}"`);
   }
 
-  const day = fechaEmision.getDate().toString().padStart(2, "0");
-  const month = (fechaEmision.getMonth() + 1).toString().padStart(2, "0");
-  const year = fechaEmision.getFullYear().toString();
+  // F-04: Extraer componentes de fecha en hora local Ecuador (UTC-5).
+  // Usar getDate()/getMonth() UTC causaría fecha incorrecta para facturas
+  // creadas entre 19:00 y 23:59 hora Ecuador (UTC 00:00-04:59 del día siguiente).
+  const { day, month, year } = toEcuadorDateParts(fechaEmision);
 
-  const fecha = `${day}${month}${year}`;              // ddmmaaaa  (8)
+  const fecha = `${day}${month}${year}`;            // ddmmaaaa  (8)
   const ambienteCode = ambiente === "PRODUCCION" ? "2" : "1";
-  const establ = estab.padStart(3, "0");              // 3 dígitos
-  const pto = ptoEmi.padStart(3, "0");                // 3 dígitos → serie = 6
-  const seq = secuencial.padStart(9, "0");            // 9 dígitos
+  const establ = estab.padStart(3, "0");            // 3 dígitos
+  const pto = ptoEmi.padStart(3, "0");              // 3 dígitos → serie = 6
+  const seq = secuencial.padStart(9, "0");          // 9 dígitos
 
   const base =
     fecha +            //  8

@@ -7,23 +7,26 @@
 
 1. [Introducción](#1-introducción)
 2. [Acceso al sistema](#2-acceso-al-sistema)
-3. [Panel principal (Dashboard)](#3-panel-principal-dashboard)
-4. [Facturas](#4-facturas)
-5. [Clientes](#5-clientes)
-6. [Productos](#6-productos)
-7. [Inventario](#7-inventario)
-8. [Empresa](#8-empresa)
-9. [Sucursales](#9-sucursales)
-10. [Usuarios](#10-usuarios)
-11. [Tipos de negocio](#11-tipos-de-negocio)
-12. [Roles y permisos](#12-roles-y-permisos)
-13. [Preguntas frecuentes](#13-preguntas-frecuentes)
+3. [Barra superior](#3-barra-superior)
+4. [Panel principal (Dashboard)](#4-panel-principal-dashboard)
+5. [Facturas](#5-facturas)
+6. [Clientes](#6-clientes)
+7. [Productos](#7-productos)
+8. [Inventario](#8-inventario)
+9. [Compras y Proveedores](#9-compras-y-proveedores)
+10. [Reportes](#10-reportes)
+11. [Empresa](#11-empresa)
+12. [Sucursales](#12-sucursales)
+13. [Usuarios](#13-usuarios)
+14. [Tipos de negocio](#14-tipos-de-negocio)
+15. [Roles y permisos](#15-roles-y-permisos)
+16. [Preguntas frecuentes](#16-preguntas-frecuentes)
 
 ---
 
 ## 1. Introducción
 
-El sistema permite emitir **facturas electrónicas válidas ante el SRI** de Ecuador, gestionar su catálogo de productos, clientes e inventario, todo desde una única plataforma web.
+El sistema permite emitir **facturas electrónicas válidas ante el SRI** de Ecuador, gestionar su catálogo de productos, clientes, inventario, compras a proveedores y reportes de negocio, todo desde una única plataforma web.
 
 ### Qué puede hacer el sistema
 
@@ -32,7 +35,9 @@ El sistema permite emitir **facturas electrónicas válidas ante el SRI** de Ecu
 | Facturación electrónica | Genera, firma y envía comprobantes al SRI en tiempo real |
 | Clientes | Registro de compradores con validación de identificación |
 | Productos | Catálogo con precios, IVA y campos específicos por tipo de negocio |
-| Inventario | Control de stock por sucursal, movimientos y transferencias |
+| Inventario | Control de stock por sucursal, alertas de mínimo, movimientos y transferencias |
+| Compras | Registro de ingresos de mercadería y gestión de proveedores |
+| Reportes | Ventas por período, resumen IVA Form. 104 y top productos con exportación CSV |
 | Multi-sucursal | Cada usuario puede operar desde su sucursal asignada |
 | Usuarios y roles | Administradores y empleados con permisos diferenciados |
 
@@ -57,11 +62,45 @@ Si sus credenciales son correctas será redirigido al panel principal. La sesió
 
 ### Cerrar sesión
 
-En la parte inferior del menú lateral haga clic en **Cerrar sesión**. La sesión se invalida inmediatamente en el servidor.
+Haga clic en su **avatar** (esquina superior derecha) y luego en **Cerrar sesión**. La sesión se invalida inmediatamente en el servidor.
 
 ---
 
-## 3. Panel principal (Dashboard)
+## 3. Barra superior
+
+La barra superior es visible en todas las pantallas del sistema y contiene dos elementos en el lado derecho:
+
+### Notificaciones (campana)
+
+El ícono de campana muestra alertas activas del sistema. Actualmente reporta **productos con stock por debajo del mínimo configurado**.
+
+| Indicador | Significado |
+|---|---|
+| Sin número | Todo en orden — ningún producto bajo el mínimo |
+| Número rojo | Cantidad de productos que requieren reabastecimiento |
+
+Al hacer clic en la campana se despliega un panel con el detalle de cada alerta:
+
+- Nombre del producto y código
+- Sucursal afectada
+- Stock actual (en rojo) vs. mínimo configurado
+- Chip **"Pedir +X"** con la cantidad exacta que falta para llegar al mínimo
+
+Al pie del panel hay un enlace directo a **Ver inventario completo**.
+
+> Las alertas se actualizan automáticamente cada 5 minutos. Si acaba de registrar una compra o ajuste, recargue la página para ver el estado inmediato.
+
+### Perfil de usuario
+
+El avatar con sus iniciales abre un menú con:
+
+- Nombre completo y correo electrónico
+- Rol (**Admin** o **Empleado**) y sucursal asignada
+- Botón **Cerrar sesión**
+
+---
+
+## 4. Panel principal (Dashboard)
 
 El dashboard muestra un resumen del estado de su facturación:
 
@@ -76,9 +115,9 @@ Los datos se actualizan cada vez que accede a la página.
 
 ---
 
-## 4. Facturas
+## 5. Facturas
 
-### 4.1 Listado de facturas
+### 5.1 Listado de facturas
 
 Ingrese a **Facturas** desde el menú lateral. La pantalla muestra todas las facturas de su empresa con:
 
@@ -103,7 +142,7 @@ Ingrese a **Facturas** desde el menú lateral. La pantalla muestra todas las fac
 | **RECHAZADO** | El SRI la rechazó; revise el motivo en el detalle |
 | **ANULADO** | Comprobante invalidado; no tiene validez tributaria |
 
-### 4.2 Crear una factura
+### 5.2 Crear una factura
 
 Haga clic en **Nueva Factura** (desde el listado o desde el botón del menú lateral).
 
@@ -115,7 +154,7 @@ Haga clic en el campo de cliente y empiece a escribir el nombre, cédula o RUC. 
 
 #### Paso 2 — Fecha de emisión
 
-Por defecto es la fecha actual. Puede cambiarla haciendo clic en el campo si necesita emitir con fecha retroactiva (dentro de los límites que acepta el SRI).
+Por defecto es la fecha actual. Puede cambiarla si necesita emitir con fecha retroactiva (dentro de los límites que acepta el SRI).
 
 #### Paso 3 — Agregar productos
 
@@ -131,7 +170,7 @@ Cada fila del detalle representa un ítem de la factura.
 
 Para agregar más líneas haga clic en **+ Agregar línea**. Para eliminar una línea use el botón **×** al final de la fila.
 
-**Productos favoritos:** Si tiene productos marcados con ★, aparecen como accesos rápidos en la parte superior del formulario. Haga clic en uno para agregarlo directamente a la primera línea vacía.
+**Productos favoritos:** Si tiene productos marcados con ★, aparecen como accesos rápidos en la parte superior del formulario.
 
 #### Paso 4 — Forma de pago y monto
 
@@ -143,7 +182,7 @@ Seleccione la **forma de pago**:
 | Transferencia bancaria | Depósito o transferencia |
 | Tarjeta de crédito | Pago con tarjeta |
 
-Ingrese el **monto recibido** del cliente. El sistema calcula el vuelto automáticamente. No podrá emitir la factura si el monto recibido es menor al total.
+Ingrese el **monto recibido** del cliente. El sistema calcula el vuelto automáticamente.
 
 #### Paso 5 — Observaciones (opcional)
 
@@ -153,45 +192,40 @@ Campo libre para notas internas o referencias. No aparece en el XML enviado al S
 
 Haga clic en **Emitir Factura**. El sistema:
 
-1. Guarda la factura en la base de datos con estado **PENDIENTE**
+1. Guarda la factura con estado **PENDIENTE**
 2. Genera el XML según el formato SRI
 3. Firma el XML con su certificado digital (.p12)
 4. Envía el comprobante al servidor del SRI
 5. Actualiza el estado a **ENVIADO** o **AUTORIZADO** según la respuesta
 
-Si el SRI responde en el momento, la factura queda en **AUTORIZADO** directamente.
+### 5.3 Enviar factura al SRI manualmente
 
-### 4.3 Enviar factura al SRI manualmente
+Si una factura quedó en **PENDIENTE**, puede reenviarla desde el listado haciendo clic en **Enviar SRI**.
 
-Si una factura quedó en **PENDIENTE** (por problemas de conexión), puede reenviarla desde el listado:
-
-1. Localice la factura
-2. Haga clic en **Enviar SRI** en la columna de acciones
-
-### 4.4 Anular una factura
+### 5.4 Anular una factura
 
 Solo las facturas **AUTORIZADAS** pueden anularse.
 
-1. Abra el detalle de la factura haciendo clic en ella
+1. Abra el detalle de la factura
 2. Haga clic en **Anular**
 3. Ingrese el motivo de anulación
 4. Confirme la acción
 
-> **Importante:** La anulación en el sistema cambia el estado localmente. La nota de crédito o el proceso ante el SRI para invalidar el número de autorización debe gestionarse según los procedimientos vigentes del SRI.
+> La anulación cambia el estado localmente. El proceso ante el SRI para invalidar el número de autorización debe gestionarse según los procedimientos vigentes.
 
-### 4.5 Descargar PDF
+### 5.5 Descargar PDF
 
-Desde el detalle de una factura autorizada, haga clic en **Descargar PDF**. El PDF incluye todos los datos del comprobante, los totales por tipo de IVA, forma de pago y el número de autorización del SRI.
+Desde el detalle de una factura autorizada, haga clic en **Descargar PDF**. El PDF incluye todos los datos del comprobante, totales por tipo de IVA, forma de pago y número de autorización.
 
 ---
 
-## 5. Clientes
+## 6. Clientes
 
-### 5.1 Listado y búsqueda
+### 6.1 Listado y búsqueda
 
 Ingrese a **Clientes** desde el menú. Puede buscar por nombre o número de identificación.
 
-### 5.2 Crear o editar un cliente
+### 6.2 Crear o editar un cliente
 
 Haga clic en **+ Nuevo Cliente** o en **Editar** en la fila de un cliente existente.
 
@@ -204,39 +238,31 @@ Haga clic en **+ Nuevo Cliente** o en **Editar** en la fila de un cliente existe
 | Teléfono | Número de contacto (opcional) |
 | Dirección | Dirección del cliente (opcional) |
 
-> **Consumidor Final:** Use esta opción para ventas donde el cliente no proporciona datos. La identificación se llena automáticamente con el valor requerido por el SRI.
+> **Consumidor Final:** Use esta opción para ventas donde el cliente no proporciona datos. La identificación se llena automáticamente con el valor requerido por el SRI (`9999999999999`).
 
-### 5.3 Importar clientes desde Excel
+### 6.3 Importar clientes desde CSV
 
 Haga clic en **Importar CSV** y seleccione un archivo `.csv` con el siguiente formato:
 
 ```
 tipoIdentif,identificacion,razonSocial,email,telefono,direccion
 CEDULA,1712345678,Juan Pérez,juan@email.com,0991234567,Quito
-RUC,1790123456001,Empresa ABC S.A.,,, Av. 6 de Diciembre
+RUC,1790123456001,Empresa ABC S.A.,,,Av. 6 de Diciembre
 ```
 
-El sistema actualizará los registros existentes (por identificación) y creará los nuevos. Al finalizar verá un resumen con el número de creados, actualizados y errores.
+El sistema actualizará los registros existentes (por identificación) y creará los nuevos. Al finalizar verá un resumen con creados, actualizados y errores.
 
 ---
 
-## 6. Productos
+## 7. Productos
 
-### 6.1 Listado y búsqueda
+### 7.1 Listado y búsqueda
 
-Ingrese a **Productos**. Puede buscar por código o descripción. Los productos aparecen en la tabla con:
+Ingrese a **Productos**. Puede buscar por código, descripción o código de barras. Los productos aparecen con código, descripción, tipo, precio con unidad de medida, IVA y acciones.
 
-- Ícono de favorito (★ / ☆)
-- Código principal
-- Descripción
-- Tipo (Bien o Servicio)
-- Precio unitario con su unidad de medida (si aplica)
-- IVA
-- Acciones
+**Marcar como favorito:** Haga doble clic en una fila o clic en el ícono ★/☆. Los favoritos aparecen como acceso rápido al crear facturas.
 
-**Marcar como favorito:** Haga doble clic en una fila, o haga clic en el ícono ★/☆. Los favoritos aparecen como acceso rápido al crear facturas.
-
-### 6.2 Crear o editar un producto
+### 7.2 Crear o editar un producto
 
 Haga clic en **+ Nuevo Producto** o en **Editar**.
 
@@ -253,129 +279,247 @@ Haga clic en **+ Nuevo Producto** o en **Editar**.
 
 #### Campos según el tipo de negocio
 
-Los campos extra solo aparecen si su empresa tiene configurado el tipo de negocio correspondiente (ver sección [Empresa](#8-empresa)).
+Los campos extra solo aparecen si su empresa tiene configurado el tipo correspondiente (ver [Empresa](#11-empresa)).
 
-**Farmacia (PHARMACY):**
+**Farmacia:** Principio activo, lote, vencimiento (obligatorio), registro sanitario ARCSA, requiere receta.
 
-| Campo | Descripción |
-|---|---|
-| Principio Activo | Ingrediente activo del medicamento |
-| Lote | Número de lote del fabricante |
-| Vencimiento | Fecha de caducidad (obligatoria en farmacias) |
-| Registro Sanitario (ARCSA) | Número de registro sanitario vigente |
-| Requiere receta | Marque si el producto requiere prescripción médica |
+**Minimarket:** Código de barras, unidad de medida, lote, vencimiento.
 
-**Minimarket / Abarrotes (GROCERY):**
+**Ferretería:** Código de barras, unidad de medida.
 
-| Campo | Descripción |
-|---|---|
-| Código de Barras | EAN-13 o UPC para escaneo |
-| Unidad de Medida | Unidad, Kilogramo, Litro, Metro, m², Caja |
-| Lote | Número de lote (opcional) |
-| Vencimiento | Fecha de caducidad (opcional) |
+**Licorera:** Grados de alcohol (%), volumen (ml), país de origen.
 
-**Ferretería (HARDWARE_STORE):**
+### 7.3 Código de barras
+
+Si su tipo de negocio habilita este campo, puede usar un lector de barras USB: apunte al código, escanéelo, y el sistema localiza el producto automáticamente en cualquier buscador.
+
+### 7.4 Configurar inventario por producto
+
+Desde la tabla de productos, haga clic en **Stock** (visible solo para bienes y administradores):
 
 | Campo | Descripción |
 |---|---|
-| Código de Barras | EAN-13 o UPC para escaneo |
-| Unidad de Medida | Unidad, Kilogramo, Litro, Metro, m², Caja |
+| Activar control de stock | Habilita el seguimiento de inventario para este producto |
+| Costo Promedio (USD) | Costo de adquisición inicial |
+| Stock Mínimo | Cantidad mínima — al caer bajo este valor se genera una alerta |
 
-**Licorera (LIQUOR_STORE):**
-
-| Campo | Descripción |
-|---|---|
-| Grados de Alcohol (%) | Porcentaje de alcohol (ej. 40.0) |
-| Volumen (ml) | Contenido en mililitros (ej. 750) |
-| País de Origen | País donde se elaboró el producto |
-
-### 6.3 Código de barras y búsqueda rápida
-
-Si su tipo de negocio habilita el campo de código de barras, puede ingresar el EAN-13 o UPC del producto. Esto le permite:
-
-- Buscar un producto escribiendo su código de barras en cualquier buscador del sistema
-- Conectar un lector de barras USB: apunte al código, escaneelo, y el sistema localiza el producto automáticamente
-
-### 6.4 Configurar inventario por producto
-
-Desde la tabla de productos, haga clic en **Stock** (visible solo para bienes y administradores) para configurar el seguimiento de inventario de ese producto:
-
-| Campo | Descripción |
-|---|---|
-| Activar control de stock | Habilita el seguimiento de este producto |
-| Costo Promedio (USD) | Costo de adquisición para el cálculo de márgenes |
-| Stock Mínimo | Cantidad mínima antes de considerar reposición |
+> **Importante:** El stock mínimo configurado aquí se aplica a todos los registros de stock del producto (todas las sucursales). Para ajustar el mínimo por sucursal individualmente, use la edición directa en la tabla de **Inventario**.
 
 ---
 
-## 7. Inventario
+## 8. Inventario
 
-El módulo de inventario permite ver y gestionar el stock de todos sus productos con seguimiento activado. Está disponible cuando el tipo de negocio lo requiere (los restaurantes, por ejemplo, no lo tienen activo).
+El módulo de inventario permite ver y gestionar el stock de todos los productos con seguimiento activado. Disponible según el tipo de negocio (los restaurantes no lo tienen activo).
 
-### 7.1 Stock actual
+### 8.1 Panel de alertas
 
-Ingrese a **Inventario**. Verá una tabla con:
+Si hay productos con stock **igual o menor al mínimo configurado**, la pantalla muestra un panel de alerta al inicio con una tabla que indica:
 
-- Producto (código + descripción)
-- Sucursal
-- Cantidad actual en stock
-- Stock mínimo configurado
-- Costo promedio
+- Código y nombre del producto
+- Sucursal afectada
+- **Stock actual** (en rojo)
+- Mínimo configurado
+- **Déficit** — cantidad exacta que hay que reponer
 
-#### Ajuste de inventario
+Este mismo conteo aparece en la **campana de la barra superior** como número rojo, visible desde cualquier pantalla del sistema.
 
-Los administradores pueden realizar ajustes directos:
+### 8.2 Tabla de stock
 
-1. Haga clic en **Ajuste de Stock**
-2. Seleccione el producto
-3. Seleccione la sucursal
-4. Ingrese la cantidad (positiva para incrementar, use el tipo **Ajuste negativo** para reducir)
-5. Ingrese el costo unitario y una nota explicativa
-6. Guarde el ajuste
+Muestra todos los productos con inventario activo, con columnas: código, producto, tipo, sucursal, cantidad actual, mínimo, costo promedio y estado (Normal / Stock bajo).
 
-Cada ajuste queda registrado en el kardex con la fecha, usuario y motivo.
+#### Editar el stock mínimo directamente
 
-### 7.2 Kardex (historial de movimientos)
+En la columna **Mín.**, haga clic en el número para editarlo en línea:
 
-Ingrese a **Inventario → Kardex**. Muestra el historial completo de movimientos de stock:
+1. El número se convierte en un campo editable (borde amarillo)
+2. Escriba el nuevo valor
+3. Presione **Enter** para guardar o **Escape** para cancelar
+
+El cambio se guarda de inmediato y la alerta se activa o desactiva automáticamente según el nuevo mínimo.
+
+### 8.3 Ajuste de inventario
+
+Los administradores pueden realizar ajustes directos haciendo clic en **+ Ajuste**:
+
+1. Seleccione el producto
+2. Seleccione la sucursal
+3. Ingrese la cantidad (positiva para incrementar, negativa para reducir)
+4. Ingrese el costo unitario y una nota explicativa
+5. Guarde el ajuste
+
+Cada ajuste queda registrado en el kardex con fecha, usuario y motivo.
+
+### 8.4 Kardex (historial de movimientos)
+
+Ingrese a **Inventario → Kardex** para ver el historial completo:
 
 | Tipo de movimiento | Descripción |
 |---|---|
-| Entrada | Ingreso de mercadería (compra o ajuste positivo) |
-| Salida | Despacho por venta o ajuste negativo |
-| Ajuste + | Corrección positiva de inventario |
-| Ajuste - | Corrección negativa de inventario |
-| Transf. entrada | Mercadería recibida de otra sucursal |
-| Transf. salida | Mercadería enviada a otra sucursal |
+| ENTRADA | Ingreso por compra o ajuste positivo |
+| SALIDA | Despacho por venta o ajuste negativo |
+| AJUSTE_POSITIVO | Corrección positiva manual |
+| AJUSTE_NEGATIVO | Corrección negativa manual |
+| TRANSFERENCIA_IN | Mercadería recibida de otra sucursal |
+| TRANSFERENCIA_OUT | Mercadería enviada a otra sucursal |
 
-**Filtros disponibles:**
-- Por producto
-- Por sucursal
+Cada movimiento muestra: fecha, usuario, cantidad, costo unitario, costo total y saldo resultante.
 
-Cada movimiento muestra: fecha, usuario responsable, cantidad, costo unitario, costo total y saldo resultante.
+### 8.5 Transferencias entre sucursales
 
-### 7.3 Transferencias entre sucursales
+En **Inventario → Transferencias**, haga clic en **Nueva Transferencia**:
 
-Ingrese a **Inventario → Transferencias**.
+1. Seleccione sucursal origen y destino
+2. Agregue los productos con sus cantidades
+3. Confirme
 
-**Crear una transferencia:**
-
-1. Haga clic en **Nueva Transferencia**
-2. Seleccione la **sucursal origen** y la **sucursal destino**
-3. Agregue los productos a transferir con sus cantidades y costos
-4. Confirme la transferencia
-
-El sistema descuenta el stock en la sucursal origen e incrementa en la sucursal destino en el mismo momento. Ambos movimientos quedan registrados en el kardex con referencia cruzada.
+El stock se descuenta en origen y se acredita en destino simultáneamente. Ambos movimientos quedan enlazados en el kardex.
 
 ---
 
-## 8. Empresa
+## 9. Compras y Proveedores
+
+Este módulo cierra el ciclo de inventario: registra los ingresos de mercadería y actualiza el stock automáticamente.
+
+### 9.1 Proveedores
+
+Ingrese a **Compras** y seleccione la pestaña **Proveedores**.
+
+#### Crear o editar un proveedor
+
+Haga clic en **+ Nuevo Proveedor**:
+
+| Campo | Descripción |
+|---|---|
+| Nombre | Razón social o nombre del proveedor |
+| RUC | Número de RUC del proveedor (opcional) |
+| Email | Correo de contacto (opcional) |
+| Teléfono | Número de contacto (opcional) |
+| Dirección | Dirección del proveedor (opcional) |
+
+Para editar, haga clic en **Editar** en la fila. Para eliminar (desactivar), use **Eliminar**.
+
+### 9.2 Registrar una compra
+
+En la pestaña **Compras**, haga clic en **+ Nueva Compra**.
+
+#### Datos del documento
+
+| Campo | Descripción |
+|---|---|
+| Proveedor | Seleccione de la lista o deje vacío si no tiene proveedor registrado |
+| Sucursal | Sucursal donde ingresa la mercadería |
+| Tipo de Documento | Factura, Nota de Entrega, Liquidación de Compra u Otro |
+| N° Documento | Número del documento del proveedor (ej. 001-001-000000123) |
+| Fecha de Compra | Fecha en que se recibió la mercadería |
+| Notas | Observaciones opcionales |
+
+#### Ítems de la compra
+
+Por cada producto recibido:
+
+1. Busque el producto en el **buscador** (escriba nombre o código)
+2. Verifique o complete la **descripción** (editable aunque se seleccione un producto)
+3. Ingrese la **cantidad** recibida
+4. Ingrese el **costo unitario** (precio de compra sin IVA)
+
+El sistema calcula el total en tiempo real. Puede agregar líneas con **+ Agregar ítem** y eliminarlas con **✕**.
+
+> **Ítems sin producto vinculado:** Puede registrar líneas escribiendo directamente la descripción sin seleccionar un producto del catálogo. En ese caso no se actualiza el inventario, pero queda el registro de gasto.
+
+#### Efecto en inventario
+
+Al guardar la compra, para cada ítem que tenga un producto vinculado con **control de stock activo**:
+
+- Se registra un movimiento **ENTRADA** en el kardex
+- Se actualiza el stock de la sucursal seleccionada
+- Se recalcula el **costo promedio ponderado** del producto automáticamente
+
+### 9.3 Ver detalle de una compra
+
+En el listado de compras, haga clic en **Ver** para acceder al detalle completo: datos del documento, proveedor, ítems, costos y totales.
+
+### 9.4 Filtrar compras por período
+
+Use los campos **Desde** y **Hasta** en la pestaña Compras y haga clic en **Filtrar**. Al pie de la tabla se muestra el total del período filtrado.
+
+---
+
+## 10. Reportes
+
+El módulo de reportes permite analizar las ventas del negocio y preparar la información para declaraciones tributarias.
+
+Ingrese a **Reportes** desde el menú lateral.
+
+### 10.1 Selector de período
+
+Elija un período predefinido con un clic:
+
+| Preset | Cobertura |
+|---|---|
+| Hoy | Solo el día actual |
+| Esta semana | Lunes al día actual |
+| Este mes | Del 1 al día actual del mes en curso |
+| Mes anterior | El mes calendario anterior completo |
+| Este trimestre | Los últimos 3 meses |
+| Este año | Del 1 de enero al día actual |
+
+O use **Personalizado** para definir un rango exacto con fechas **Desde** y **Hasta**, luego haga clic en **Aplicar**.
+
+### 10.2 Tab Ventas
+
+Muestra un análisis de las ventas del período seleccionado.
+
+**Tarjetas de resumen:**
+
+| Tarjeta | Descripción |
+|---|---|
+| Facturas | Cantidad de comprobantes emitidos (excluye anuladas y rechazadas) |
+| Subtotal | Suma de los subtotales sin IVA |
+| IVA Cobrado | Total de IVA recaudado |
+| **Total** | Importe total facturado (destacado en amarillo) |
+
+**Tabla por período:**
+- Si el rango es **≤ 31 días**: agrupa por día
+- Si el rango es **> 31 días**: agrupa por mes
+
+Cada fila muestra: período, N° facturas, subtotal, IVA y total. La fila de pie suma todos los valores.
+
+**Exportar CSV:** Haga clic en **Exportar CSV** para descargar los datos en formato compatible con Excel. El archivo incluye encabezados y está codificado en UTF-8 con BOM para correcta visualización en Excel.
+
+### 10.3 Tab IVA Form. 104
+
+Presenta el resumen de IVA del período, organizado según los campos del **Formulario 104** del SRI que debe presentar mensualmente.
+
+| Campo Form. 104 | Descripción |
+|---|---|
+| **401** — Base imponible tarifa 0% | Ventas gravadas al 0% |
+| **405** — Base imponible tarifa 5% | Ventas gravadas al 5% (si aplica) |
+| **412** — Base imponible gravada 15% | Ventas gravadas a la tarifa estándar |
+| **413** — IVA generado 15% | IVA cobrado en ventas gravadas |
+| Total ventas con IVA | Suma de todas las ventas del período |
+
+> Este resumen es referencial. Valídelo siempre con su contador antes de declarar.
+
+**Exportar CSV:** El archivo generado está listo para entregar al contador.
+
+### 10.4 Tab Top Productos
+
+Ranking de los 10 productos con mayor monto vendido en el período:
+
+- Posición (el #1 destacado en amarillo)
+- Código y descripción
+- Cantidad total vendida
+- Subtotal sin IVA
+
+**Exportar CSV:** Descarga el ranking completo.
+
+---
+
+## 11. Empresa
 
 Esta sección solo es accesible para usuarios con rol **ADMIN**.
 
-### 8.1 Datos tributarios
-
-Ingrese a **Empresa** desde el menú.
+### 11.1 Datos tributarios
 
 | Campo | Descripción |
 |---|---|
@@ -389,9 +533,9 @@ Ingrese a **Empresa** desde el menú.
 | Contribuyente Especial | Número de resolución si aplica |
 | Obligado a llevar contabilidad | Marque según su obligación tributaria |
 
-> **Secuencial Inicial:** Solo tiene efecto antes de emitir la primera factura. Una vez emitida, la secuencia no puede retroceder.
+> **Secuencial Inicial:** Solo tiene efecto antes de emitir la primera factura.
 
-### 8.2 Tipo de negocio
+### 11.2 Tipo de negocio
 
 El campo **Giro del negocio** determina qué campos, módulos y validaciones están activos en todo el sistema.
 
@@ -401,55 +545,38 @@ El campo **Giro del negocio** determina qué campos, módulos y validaciones est
 | Farmacia | Habilita lote, vencimiento, registro ARCSA y receta |
 | Minimarket | Habilita código de barras, unidad de medida, lote y vencimiento |
 | Licorera | Habilita grados de alcohol, volumen y país de origen |
-| Restaurante | Oculta el módulo de inventario tradicional |
+| Restaurante | Oculta el módulo de inventario |
 | Ropa y Calzado | Configuración estándar con inventario |
 | Ferretería | Habilita código de barras y unidad de medida |
 
-Cambie el tipo de negocio y haga clic en **Guardar Configuración**. El cambio aplica de inmediato en todo el sistema.
-
-### 8.3 Configuración SRI
+### 11.3 Configuración SRI
 
 | Campo | Opciones |
 |---|---|
-| Ambiente | **Pruebas** (certificación) o **Producción** |
+| Ambiente | **Pruebas** (sin validez legal) o **Producción** (válido ante el SRI) |
 | Tipo de Emisión | Normal o Indisponibilidad del sistema |
 
-> **Ambiente Pruebas:** Las facturas se envían al servidor de pruebas del SRI y no tienen validez legal. Use este modo para verificar que todo funciona antes de activar Producción.
+### 11.4 Logo de la empresa
 
-> **Ambiente Producción:** Las facturas enviadas tienen validez tributaria real. Asegúrese de tener su certificado vigente antes de activar este ambiente.
+Aparece en el PDF de las facturas. Formatos aceptados: PNG, JPG, SVG, WebP. Tamaño máximo: 2 MB.
 
-### 8.4 Logo de la empresa
+### 11.5 Certificado digital
 
-Aparece en el PDF de la factura.
+El certificado de firma electrónica (.p12) es obligatorio para emitir facturas válidas.
 
-- Formatos aceptados: PNG, JPG, SVG, WebP
-- Tamaño máximo: 2 MB
-- Para subir: arrastre el archivo al área indicada o haga clic en ella
-- Para cambiar: haga clic en **Cambiar**
-- Para eliminar: haga clic en **Quitar**
+1. En la sección **Cargar Certificado**, seleccione su archivo `.p12` o `.pfx`
+2. Ingrese la contraseña del certificado
+3. Haga clic en **Cargar Certificado**
 
-### 8.5 Certificado digital
-
-El certificado de firma electrónica (.p12) es obligatorio para emitir facturas válidas ante el SRI.
-
-**Cargar el certificado:**
-
-1. En la sección **Cargar Certificado**, haga clic en el campo de archivo
-2. Seleccione su archivo `.p12` o `.pfx`
-3. Ingrese la contraseña del certificado
-4. Haga clic en **Cargar Certificado**
-
-El sistema valida el certificado y muestra su vigencia (fecha desde / hasta) y huella digital. Si ya existe un certificado activo, el nuevo lo reemplaza.
-
-> **Vigencia:** El certificado caduca en la fecha indicada. Renuévelo antes de esa fecha para no interrumpir la facturación.
+El sistema muestra la vigencia (fecha desde/hasta) y huella digital. Si ya existe un certificado activo, el nuevo lo reemplaza.
 
 ---
 
-## 9. Sucursales
+## 12. Sucursales
 
 Accesible solo para **ADMIN**.
 
-Una sucursal representa un local o punto de venta físico. Cada usuario puede estar asignado a una sucursal, y cada factura registra la sucursal desde donde fue emitida.
+Una sucursal representa un local o punto de venta físico. Cada usuario puede estar asignado a una sucursal, y el stock y las facturas se registran por sucursal.
 
 ### Crear una sucursal
 
@@ -460,26 +587,18 @@ Una sucursal representa un local o punto de venta físico. Cada usuario puede es
 
 ### Editar o desactivar
 
-Haga clic en **Editar** en la fila de la sucursal. Puede modificar nombre, dirección o desactivarla. Las sucursales desactivadas no aparecen como opciones de asignación para nuevos usuarios.
+Haga clic en **Editar** en la fila de la sucursal. Las sucursales desactivadas no aparecen como opciones de asignación para nuevos usuarios.
 
 ---
 
-## 10. Usuarios
+## 13. Usuarios
 
 Accesible solo para **ADMIN**.
-
-### Roles del sistema
-
-| Rol | Acceso |
-|---|---|
-| **ADMIN** | Facturación + gestión de empresa, sucursales, usuarios y configuración completa |
-| **EMPLEADO** | Solo facturación (facturas, clientes, productos e inventario según su sucursal) |
 
 ### Crear un usuario
 
 1. Ingrese a **Usuarios**
 2. Haga clic en **+ Nuevo Usuario**
-3. Complete los datos:
 
 | Campo | Descripción |
 |---|---|
@@ -489,38 +608,27 @@ Accesible solo para **ADMIN**.
 | Rol | Admin o Empleado |
 | Sucursal | Sucursal asignada (opcional) |
 
-### Editar un usuario
+### Editar y desactivar
 
-Haga clic en **Editar** en la fila del usuario. Puede modificar todos los campos, incluyendo restablecer la contraseña.
-
-### Desactivar un usuario
-
-En el formulario de edición, desmarque **Usuario activo**. El usuario no podrá iniciar sesión pero sus facturas y movimientos se conservan.
+Haga clic en **Editar** en la fila del usuario. En el formulario de edición, desmarque **Usuario activo** para desactivarlo. El usuario no podrá iniciar sesión pero sus facturas y movimientos se conservan.
 
 ---
 
-## 11. Tipos de negocio
+## 14. Tipos de negocio
 
 ### GENERAL — Tienda genérica
 
-Configuración base del sistema. Sin campos extra. Ideal para negocios que no encajan en las categorías específicas.
+Configuración base. Sin campos extra. Ideal para negocios que no encajan en las categorías específicas.
 
-**Lo que tiene activo:** Facturación, clientes, productos, inventario.
+**Módulos activos:** Facturación, clientes, productos, inventario, compras, reportes.
 
 ---
 
 ### PHARMACY — Farmacia
 
-Configuración orientada al control de medicamentos y productos de salud.
+**Campos extra en productos:** Principio activo, lote, vencimiento (obligatorio), registro sanitario ARCSA, requiere receta.
 
-**Campos extra en productos:**
-- **Principio activo** — ingrediente activo del medicamento
-- **Lote** — número de lote del fabricante para trazabilidad
-- **Vencimiento** — fecha de caducidad (campo obligatorio)
-- **Registro sanitario (ARCSA)** — número de autorización de comercialización
-- **Requiere receta** — indicador para productos de venta bajo prescripción
-
-**Código de barras activo:** Permite escanear medicamentos por su código de barras durante la facturación.
+**Código de barras activo** para escaneo de medicamentos.
 
 **Validación de vencimiento:** El sistema requiere ingresar fecha de vencimiento; no puede quedar vacía.
 
@@ -528,70 +636,57 @@ Configuración orientada al control de medicamentos y productos de salud.
 
 ### LIQUOR_STORE — Licorera
 
-Configuración para venta de bebidas alcohólicas.
-
-**Campos extra en productos:**
-- **Grados de alcohol (%)** — concentración alcohólica
-- **Volumen (ml)** — contenido del envase en mililitros
-- **País de origen** — procedencia del producto
+**Campos extra en productos:** Grados de alcohol (%), volumen (ml), país de origen.
 
 ---
 
 ### GROCERY — Minimarket / Abarrotes
 
-Configuración para venta de productos de consumo masivo y alta rotación.
+**Campos extra en productos:** Código de barras (EAN-13/UPC), unidad de medida, lote, vencimiento.
 
-**Campos extra en productos:**
-- **Código de barras (EAN-13 / UPC)** — para escaneo en punto de venta
-- **Unidad de medida** — Unidad, Kilogramo, Litro, Metro, m², Caja
-- **Lote** — número de lote (opcional)
-- **Vencimiento** — fecha de caducidad (opcional)
-
-**Búsqueda por código de barras:** En cualquier buscador del sistema, escriba o escanee el código de barras para localizar el producto instantáneamente.
+**Búsqueda por código de barras** en cualquier buscador del sistema.
 
 ---
 
 ### RESTAURANT — Restaurante
 
-Configuración para establecimientos de alimentos y bebidas.
-
-**Diferencias clave:**
-- El módulo de **Inventario** está oculto (los restaurantes no suelen llevar control de stock línea por línea)
-- Los productos representan platos o preparaciones del menú
+El módulo de **Inventario** y **Compras** está oculto. Los productos representan platos del menú.
 
 ---
 
 ### CLOTHING_STORE — Ropa y Calzado
 
-Configuración estándar con inventario habilitado. Actualmente sin campos específicos para tallas o colores; se recomienda codificar las variantes en el código principal (ej. `CAMISA-M-AZUL`).
+Configuración estándar con inventario habilitado. Se recomienda codificar las variantes en el código principal (ej. `CAMISA-M-AZUL`).
 
 ---
 
 ### HARDWARE_STORE — Ferretería
 
-Configuración para venta de materiales y herramientas.
+**Campos extra en productos:** Código de barras (EAN-13/UPC), unidad de medida.
 
-**Campos extra en productos:**
-- **Código de barras (EAN-13 / UPC)** — para escaneo en punto de venta
-- **Unidad de medida** — Unidad, Kilogramo, Litro, Metro, m², Caja
-
-**Unidad de medida en factura:** El precio se muestra como `$X.XX/kg` o `$X.XX/m` en el catálogo para mayor claridad.
+El precio se muestra con la unidad en el catálogo (ej. `$12.50/kg`).
 
 ---
 
-## 12. Roles y permisos
+## 15. Roles y permisos
 
 | Función | ADMIN | EMPLEADO |
 |---|---|---|
 | Crear facturas | ✅ | ✅ |
-| Ver facturas | ✅ | ✅ (solo su sucursal) |
+| Ver facturas | ✅ | ✅ (su sucursal) |
 | Anular facturas | ✅ | ✅ |
 | Gestionar clientes | ✅ | ✅ |
 | Gestionar productos | ✅ | ✅ |
 | Ver inventario | ✅ | ✅ |
 | Ajustar stock | ✅ | ❌ |
+| Editar stock mínimo | ✅ | ❌ |
 | Crear transferencias | ✅ | ❌ |
 | Configurar inventario por producto | ✅ | ❌ |
+| Ver reportes | ✅ | ✅ |
+| Exportar reportes CSV | ✅ | ✅ |
+| Ver compras | ✅ | ✅ |
+| Registrar compras | ✅ | ✅ |
+| Gestionar proveedores | ✅ | ✅ |
 | Gestionar sucursales | ✅ | ❌ |
 | Gestionar usuarios | ✅ | ❌ |
 | Configurar empresa | ✅ | ❌ |
@@ -600,38 +695,41 @@ Configuración para venta de materiales y herramientas.
 
 ---
 
-## 13. Preguntas frecuentes
+## 16. Preguntas frecuentes
 
 **¿Por qué una factura queda en estado PENDIENTE?**
-Puede ocurrir por falta de conectividad con los servidores del SRI o por un problema temporal. Desde el listado de facturas puede reenviarla haciendo clic en **Enviar SRI**.
+Puede ocurrir por falta de conectividad con los servidores del SRI o un problema temporal. Desde el listado de facturas puede reenviarla haciendo clic en **Enviar SRI**.
 
 **¿Puedo modificar una factura ya emitida?**
-No. Las facturas electrónicas son inmutables una vez enviadas al SRI. Si necesita corregir un error, debe anular la factura y emitir una nueva.
+No. Las facturas electrónicas son inmutables una vez enviadas al SRI. Si necesita corregir un error, anule la factura y emita una nueva.
 
 **¿Qué pasa si mi certificado digital caduca?**
 El sistema no podrá firmar nuevas facturas. Renueve su certificado con un proveedor autorizado y cárguelo en **Empresa → Cargar Certificado** antes de la fecha de vencimiento.
 
-**¿Puedo usar el sistema desde el celular?**
-Sí. La interfaz es responsiva y funciona en navegadores móviles, aunque la experiencia óptima es en pantallas de escritorio.
-
 **¿Cómo funciona el ambiente de Pruebas?**
-En ambiente **Pruebas**, las facturas se envían al servidor de certificación del SRI (`celcer.sri.gob.ec`). Puede emitir y probar sin que los comprobantes tengan validez tributaria real. Cambie a **Producción** cuando esté listo para operar.
+Las facturas se envían al servidor de certificación del SRI (`celcer.sri.gob.ec`) y no tienen validez tributaria. Cambie a **Producción** cuando esté listo para operar.
 
-**¿Qué es el Consumidor Final?**
-Es el tipo de identificación que usa el SRI cuando el comprador no proporciona datos (ventas al público en general). La identificación se llena con el valor `9999999999999` que requiere el SRI para este tipo de transacción.
+**¿Cómo activo las alertas de stock mínimo?**
+En la tabla de **Inventario**, haga clic en el número de la columna **Mín.** para editarlo. También puede configurarlo desde **Productos → Stock**. Una vez que el stock caiga igual o por debajo de ese número, la alerta aparece en la campana de la barra superior y en el panel de inventario.
 
-**¿Cómo agrego productos más rápido durante la facturación?**
-Marque sus productos más vendidos como **favoritos** (★). Aparecerán como botones de acceso rápido en la pantalla de nueva factura. Si tiene lector de código de barras, conéctelo y escanee directamente en el campo de búsqueda de productos.
+**¿Por qué la campana no muestra ninguna alerta aunque el stock es bajo?**
+Las alertas se basan en el **stock mínimo configurado**. Si el mínimo es `0` (valor por defecto), ningún producto disparará una alerta aunque tenga pocas unidades. Configure el mínimo acorde a su operación: por ejemplo, si trabaja con lotes de 10 unidades, ponga el mínimo en `10` para que la alerta aparezca cuando quede 1 pedido completo pendiente.
 
-**¿Puedo tener más de una sucursal?**
-Sí. Los administradores pueden crear todas las sucursales que necesiten. Cada usuario se asigna a una sucursal, y el stock y las facturas se registran por sucursal.
+**¿El registro de una compra actualiza el inventario automáticamente?**
+Sí. Al guardar una compra, cada ítem que tenga un producto vinculado con control de stock activo genera una **ENTRADA** en el kardex, actualiza el stock de la sucursal y recalcula el costo promedio ponderado.
+
+**¿Puedo registrar una compra sin proveedor?**
+Sí. El campo proveedor es opcional. Puede registrar ingresos de mercadería aunque no tenga el proveedor cargado en el sistema.
+
+**¿Qué es el Form. 104 en Reportes?**
+Es el Formulario 104 que el SRI exige para la declaración mensual del IVA. El tab **IVA Form. 104** en Reportes organiza sus ventas exactamente con los campos que necesita ese formulario (bases imponibles 0%, 5%, 15% e IVA generado). Compártalo con su contador para agilizar la declaración.
+
+**¿Puedo usar el sistema desde el celular?**
+Sí. La interfaz es responsiva, aunque la experiencia óptima es en pantallas de escritorio.
 
 **¿Qué significa "vuelto" en la factura?**
-Es el cambio que recibe el cliente cuando paga más del total. El sistema lo calcula automáticamente al ingresar el monto recibido. Queda registrado en la factura pero no afecta los totales tributarios reportados al SRI.
-
-**¿El sistema envía la factura por correo al cliente?**
-No automáticamente en la versión actual. Puede descargar el PDF y enviarlo manualmente al cliente.
+Es el cambio que recibe el cliente cuando paga más del total. El sistema lo calcula automáticamente. Queda registrado en la factura pero no afecta los totales tributarios reportados al SRI.
 
 ---
 
-*Documento generado para uso interno. Versión correspondiente al sistema con soporte de tipos de negocio, inventario multi-sucursal y campo de código de barras y unidad de medida en productos.*
+*Versión del documento: Sistema con facturación electrónica SRI, inventario multi-sucursal, compras y proveedores, reportes con exportación CSV, alertas de stock y panel de notificaciones.*

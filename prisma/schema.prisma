@@ -70,6 +70,13 @@ enum UnidadMedida {
   CAJA
 }
 
+enum TipoDocumentoCompra {
+  FACTURA
+  NOTA_ENTREGA
+  LIQUIDACION_COMPRA
+  OTRO
+}
+
 enum StockMovementType {
   ENTRADA
   SALIDA
@@ -102,6 +109,7 @@ model User {
   updatedAt      DateTime        @updatedAt
   stockMovements StockMovement[]
   stockTransfers StockTransfer[]
+  purchases      Purchase[]
 
   @@index([email])
   @@index([companyId])
@@ -123,8 +131,11 @@ model Company {
   tipoEmision      TipoEmision @default(NORMAL)
   logoUrl          String?
   // Número desde el que inicia la secuencia de comprobantes.
-  // El sistema emite desde este número y continúa incrementando.
+  // Solo se usa para la inicialización; el contador real es secuencialSiguiente.
   secuencialInicio        Int         @default(1)
+  // Contador atómico del siguiente número de comprobante a emitir.
+  // Se incrementa con UPDATE ... RETURNING para evitar duplicados en concurrencia.
+  secuencialSiguiente     Int         @default(1)
   // Contador secuencial del codigoNumerico para generación de claveAcceso SRI.
   // Se incrementa atómicamente con cada comprobante emitido.
   codigoNumericoSiguiente Int         @default(1)
@@ -145,6 +156,8 @@ model Company {
   stocks            Stock[]
   stockMovements    StockMovement[]
   stockTransfers    StockTransfer[]
+  suppliers         Supplier[]
+  purchases         Purchase[]
 
   @@index([ruc])
   @@map("companies")
@@ -166,6 +179,7 @@ model Branch {
   stockMovements   StockMovement[]
   transfersOrigen  StockTransfer[] @relation("TransferOrigen")
   transfersDestino StockTransfer[] @relation("TransferDestino")
+  purchases        Purchase[]
 
   @@index([companyId])
   @@map("branches")
@@ -229,6 +243,7 @@ model Product {
   updatedAt        DateTime         @updatedAt
   invoiceDetails   InvoiceDetail[]
   inventoryProduct InventoryProduct?
+  purchaseItems    PurchaseItem[]
 
   @@unique([companyId, codigoPrincipal])
   @@index([companyId])
@@ -446,4 +461,106 @@ model StockTransferItem {
 
   @@index([transferId])
   @@map("stock_transfer_items")
+}
+
+// ─── Proveedores y Compras ────────────────────────────────────────────────────
+
+model Supplier {
+  id        String   @id @default(cuid())
+  companyId String
+  company   Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
+
+  ruc       String?
+  nombre    String
+  email     String?
+  telefono  String?
+  direccion String?
+  active    Boolean  @default(true)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  purchases Purchase[]
+
+  @@index([companyId])
+  @@map("suppliers")
+}
+
+model Purchase {
+  id              String              @id @default(cuid())
+  companyId       String
+  company         Company             @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  supplierId      String?
+  supplier        Supplier?           @relation(fields: [supplierId], references: [id], onDelete: SetNull)
+  branchId        String
+  branch          Branch              @relation(fields: [branchId], references: [id], onDelete: Restrict)
+  userId          String
+  user            User                @relation(fields: [userId], references: [id], onDelete: Restrict)
+
+  tipoDocumento   TipoDocumentoCompra @default(FACTURA)
+  numeroDocumento String?
+  fechaCompra     DateTime            @default(now())
+
+  subtotal        Decimal             @default(0) @db.Decimal(12, 2)
+  iva             Decimal             @default(0) @db.Decimal(12, 2)
+  total           Decimal             @default(0) @db.Decimal(12, 2)
+
+  notas           String?             @db.Text
+
+  createdAt       DateTime            @default(now())
+  updatedAt       DateTime            @updatedAt
+
+  items           PurchaseItem[]
+
+  @@index([companyId])
+  @@index([supplierId])
+  @@index([branchId])
+  @@index([fechaCompra])
+  @@map("purchases")
+}
+
+// ─── Repositorio SRI ─────────────────────────────────────────────────────────
+
+model SriEmpresa {
+  id                          String   @id @default(cuid())
+  ruc                         String   @unique @db.Char(13)
+  razonSocial                 String?
+  nombreComercial             String?
+  claseContribuyente          String?
+  tipoContribuyente           String?
+  estadoContribuyenteRuc      String?
+  fechaInicioActividades      String?
+  fechaActualizacion          String?
+  fechaSuspensionDefinitiva   String?
+  fechaReinicioActividades    String?
+  actividadEconomicaPrincipal String?  @db.Text
+  obligadoContabilidad        String?
+  agenteRetencion             String?
+  contribuyenteEspecial       String?
+  establecimientoDireccion    String?  @db.Text
+  establecimientoEstado       String?
+  establecimientoDescripcion  String?  @db.Text
+  htmlRaw                     String?  @db.Text
+  createdAt                   DateTime @default(now())
+  updatedAt                   DateTime @updatedAt
+
+  @@index([ruc])
+  @@map("sri_empresas")
+}
+
+model PurchaseItem {
+  id          String   @id @default(cuid())
+  purchaseId  String
+  purchase    Purchase @relation(fields: [purchaseId], references: [id], onDelete: Cascade)
+  productId   String?
+  product     Product? @relation(fields: [productId], references: [id], onDelete: SetNull)
+
+  descripcion   String
+  cantidad      Decimal @db.Decimal(12, 4)
+  costoUnitario Decimal @db.Decimal(12, 6)
+  costoTotal    Decimal @db.Decimal(12, 2)
+
+  @@index([purchaseId])
+  @@index([productId])
+  @@map("purchase_items")
 }

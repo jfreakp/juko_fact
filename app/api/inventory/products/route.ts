@@ -48,6 +48,16 @@ export async function POST(req: NextRequest) {
       auth.payload.companyId,
       data
     );
+
+    // Si se cambió stockMinimo, propagar a todos los Stock existentes de este producto
+    if (data.stockMinimo !== undefined) {
+      const { prisma } = await import("@/lib/prisma");
+      await prisma.stock.updateMany({
+        where: { inventoryProductId: result.id, companyId: auth.payload.companyId },
+        data: { stockMinimo: data.stockMinimo },
+      });
+    }
+
     return apiSuccess(result, 201);
   } catch (err) {
     return apiError(err instanceof Error ? err.message : "Error al configurar producto");

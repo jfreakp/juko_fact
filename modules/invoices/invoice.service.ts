@@ -11,13 +11,13 @@ function round2(n: number) {
 }
 
 function calcImporteTotal(details: CreateInvoiceDetailDTO[]): number {
-  let total = 0;
+  let totalCents = 0;
   for (const d of details) {
     const subtotal = round2(d.cantidad * d.precioUnitario - (d.descuento ?? 0));
     const iva = round2((subtotal * (IVA_RATES[d.tipoIva] ?? 0)) / 100);
-    total += subtotal + iva;
+    totalCents += Math.round((subtotal + iva) * 100);
   }
-  return round2(total);
+  return totalCents / 100;
 }
 
 export const invoiceService = {
@@ -43,6 +43,27 @@ export const invoiceService = {
 
     if (!dto.details || dto.details.length === 0) {
       throw new Error("La factura debe tener al menos un detalle");
+    }
+
+    // E-02: Validar que ningún descuento exceda el subtotal de esa línea
+    for (const d of dto.details) {
+      const subtotal = d.cantidad * d.precioUnitario;
+      if ((d.descuento ?? 0) > subtotal) {
+        throw new Error(
+          `Descuento ($${d.descuento}) no puede exceder el subtotal de línea ($${round2(subtotal)}) en "${d.descripcion}"`
+        );
+      }
+    }
+
+    // E-03: Validar que la fecha de emisión no sea futura
+    if (dto.fechaEmision) {
+      const emision = new Date(dto.fechaEmision);
+      const mañana = new Date();
+      mañana.setDate(mañana.getDate() + 1);
+      mañana.setHours(0, 0, 0, 0);
+      if (emision >= mañana) {
+        throw new Error("La fecha de emisión no puede ser una fecha futura");
+      }
     }
 
     // Validar pago si se proporcionó montoPagado
@@ -105,6 +126,15 @@ export const invoiceService = {
     if (!invoice) throw new Error("Factura no encontrada");
     if (invoice.estado === "ANULADO") throw new Error("La factura ya está anulada");
 
+    // F-02: Un comprobante autorizado por el SRI no puede anularse localmente.
+    // El contribuyente debe emitir una Nota de Crédito para reversar el efecto fiscal.
+    if (invoice.estado === "AUTORIZADO") {
+      throw new Error(
+        "No se puede anular un comprobante ya autorizado por el SRI. " +
+        "Emita una Nota de Crédito para reversar esta factura."
+      );
+    }
+
     // Sin integración de stock
     if (!invoice.branchId || !userId) {
       return invoiceRepository.anular(id, motivo);
@@ -121,7 +151,6 @@ export const invoiceService = {
           branchId: invoice.branchId!,
           productId: detail.productId,
           cantidad: Number(detail.cantidad),
-          costoUnitario: Number(detail.precioUnitario),
           referencia: invoice.secuencial,
           referenciaId: invoice.id,
           userId,
@@ -133,19 +162,8 @@ export const invoiceService = {
     });
   },
 
+  // P-02: Delegado al repositorio con groupBy — 1 query en lugar de 4.
   async getStats(companyId: string) {
-    const [total, pendientes, autorizadas, rechazadas] = await Promise.all([
-      invoiceRepository.findAll(companyId, { limit: 1 }),
-      invoiceRepository.findAll(companyId, { estado: "PENDIENTE", limit: 1 }),
-      invoiceRepository.findAll(companyId, { estado: "AUTORIZADO", limit: 1 }),
-      invoiceRepository.findAll(companyId, { estado: "RECHAZADO", limit: 1 }),
-    ]);
-
-    return {
-      total: total.total,
-      pendientes: pendientes.total,
-      autorizadas: autorizadas.total,
-      rechazadas: rechazadas.total,
-    };
+    return invoiceRepository.getStats(companyId);
   },
 };

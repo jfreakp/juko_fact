@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, FormEvent } from "react";
+import { useEffect, useRef, useState, FormEvent } from "react";
 import Header from "@/components/layout/Header";
 import Button from "@/components/ui/Button";
 import Modal from "@/components/ui/Modal";
@@ -66,6 +66,47 @@ export default function InventoryPage() {
 
   const [invProducts, setInvProducts] = useState<InvProduct[]>([]);
   const [branches, setBranches] = useState<Branch[]>([]);
+
+  // Edición inline de stockMinimo
+  const [editingMinId, setEditingMinId] = useState<string | null>(null);
+  const [editingMinVal, setEditingMinVal] = useState("");
+  const minInputRef = useRef<HTMLInputElement>(null);
+
+  async function saveStockMinimo(row: StockRow) {
+    const val = parseFloat(editingMinVal);
+    if (isNaN(val) || val < 0) { setEditingMinId(null); return; }
+    // No cambió
+    if (val === Number(row.stockMinimo)) { setEditingMinId(null); return; }
+
+    try {
+      const res = await fetch(`/api/inventory/products/${row.inventoryProduct.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ stockMinimo: val }),
+      });
+      if (res.ok) {
+        // Actualiza local para no hacer un refetch completo
+        setStock((prev) =>
+          prev.map((s) =>
+            s.id === row.id ? { ...s, stockMinimo: String(val) } : s
+          )
+        );
+        success("Mínimo actualizado");
+      } else {
+        toastError("Error al guardar");
+      }
+    } catch {
+      toastError("Error de conexión");
+    } finally {
+      setEditingMinId(null);
+    }
+  }
+
+  function startEditMin(row: StockRow) {
+    setEditingMinId(row.id);
+    setEditingMinVal(Number(row.stockMinimo).toFixed(2));
+    setTimeout(() => minInputRef.current?.select(), 30);
+  }
 
   async function loadStock() {
     setLoading(true);
@@ -155,23 +196,60 @@ export default function InventoryPage() {
 
       {/* Alertas de stock bajo */}
       {alerts.length > 0 && (
-        <div
-          className="rounded-xl p-4 mb-6 flex items-start gap-3"
-          style={{ background: "var(--warning-bg)", color: "var(--warning-text)" }}
-        >
-          <svg className="w-5 h-5 flex-shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24"
-               stroke="currentColor" strokeWidth={2}>
-            <path strokeLinecap="round" strokeLinejoin="round"
-              d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
-          </svg>
-          <div>
-            <p className="font-bold text-xs tracking-widest uppercase mb-1">
-              {alerts.length} producto{alerts.length !== 1 ? "s" : ""} con stock bajo
-            </p>
-            <p className="text-xs leading-relaxed">
-              {alerts.map((a) => a.inventoryProduct.product.descripcion).join(" · ")}
+        <div className="rounded-xl overflow-hidden mb-6" style={{ border: "2px solid var(--warning-bg)" }}>
+          {/* Header */}
+          <div
+            className="flex items-center gap-3 px-4 py-3"
+            style={{ background: "var(--warning-bg)", color: "var(--warning-text)" }}
+          >
+            <svg className="w-4 h-4 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+              <path strokeLinecap="round" strokeLinejoin="round"
+                d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+            </svg>
+            <p className="text-xs font-black tracking-widest uppercase">
+              {alerts.length} producto{alerts.length !== 1 ? "s" : ""} bajo el mínimo — requiere reabastecimiento
             </p>
           </div>
+          {/* Tabla */}
+          <table className="w-full text-xs" style={{ background: "var(--surface-low)" }}>
+            <thead>
+              <tr style={{ borderBottom: "1px solid var(--surface-highest)" }}>
+                {["Código", "Producto", "Sucursal", "Stock actual", "Mínimo", "Déficit"].map((h) => (
+                  <th key={h} className="px-4 py-2 text-left font-bold tracking-widest uppercase text-[10px]"
+                      style={{ color: "var(--text-muted)" }}>{h}</th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {alerts.map((a) => {
+                const actual = Number(a.cantidad);
+                const minimo = Number(a.stockMinimo);
+                const deficit = minimo - actual;
+                return (
+                  <tr key={a.id} style={{ borderBottom: "1px solid var(--surface-highest)" }}>
+                    <td className="px-4 py-2.5 font-mono text-[10px]" style={{ color: "var(--text-muted)" }}>
+                      {a.inventoryProduct.product.codigoPrincipal}
+                    </td>
+                    <td className="px-4 py-2.5 font-bold" style={{ color: "var(--text-base)" }}>
+                      {a.inventoryProduct.product.descripcion}
+                    </td>
+                    <td className="px-4 py-2.5" style={{ color: "var(--text-secondary)" }}>
+                      {a.branch.nombre}
+                    </td>
+                    <td className="px-4 py-2.5 font-black tabular-nums" style={{ color: "var(--error-strong)" }}>
+                      {actual.toFixed(2)}
+                    </td>
+                    <td className="px-4 py-2.5 tabular-nums" style={{ color: "var(--text-muted)" }}>
+                      {minimo.toFixed(2)}
+                    </td>
+                    <td className="px-4 py-2.5 font-bold tabular-nums" style={{ color: "var(--warning-text)" }}>
+                      +{deficit.toFixed(2)} necesarios
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
         </div>
       )}
 
@@ -266,8 +344,47 @@ export default function InventoryPage() {
                     >
                       {Number(row.cantidad).toFixed(2)}
                     </td>
-                    <td className="px-5 py-3.5 text-xs tabular-nums" style={{ color: "var(--text-muted)" }}>
-                      {Number(row.stockMinimo).toFixed(2)}
+                    <td className="px-2 py-2">
+                      {editingMinId === row.id ? (
+                        <input
+                          ref={minInputRef}
+                          type="number"
+                          min="0"
+                          step="1"
+                          value={editingMinVal}
+                          onChange={(e) => setEditingMinVal(e.target.value)}
+                          onBlur={() => saveStockMinimo(row)}
+                          onKeyDown={(e) => {
+                            if (e.key === "Enter") saveStockMinimo(row);
+                            if (e.key === "Escape") setEditingMinId(null);
+                          }}
+                          className="w-20 px-2 py-1 rounded text-xs tabular-nums text-center font-bold"
+                          style={{
+                            background: "var(--surface-high)",
+                            color: "var(--text-base)",
+                            border: "2px solid var(--primary)",
+                            outline: "none",
+                          }}
+                        />
+                      ) : (
+                        <button
+                          onClick={() => startEditMin(row)}
+                          title="Clic para editar el stock mínimo"
+                          className="px-3 py-1 rounded text-xs tabular-nums font-bold transition-colors w-full text-left"
+                          style={{ color: "var(--text-muted)" }}
+                          onMouseEnter={(e) => {
+                            (e.currentTarget as HTMLElement).style.background = "var(--surface-high)";
+                            (e.currentTarget as HTMLElement).style.color = "var(--text-base)";
+                          }}
+                          onMouseLeave={(e) => {
+                            (e.currentTarget as HTMLElement).style.background = "transparent";
+                            (e.currentTarget as HTMLElement).style.color = "var(--text-muted)";
+                          }}
+                        >
+                          {Number(row.stockMinimo).toFixed(2)}
+                          <span className="ml-1 text-[9px] opacity-50">✎</span>
+                        </button>
+                      )}
                     </td>
                     <td className="px-5 py-3.5 text-xs tabular-nums font-mono"
                         style={{ color: "var(--text-muted)" }}>

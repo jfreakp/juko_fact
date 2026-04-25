@@ -20,22 +20,35 @@ export interface ApplyMovementParams {
 
 // ─── Validación pre-factura (sin transacción) ─────────────────────────────────
 
+/**
+ * D-03: Corregido N+1. Antes ejecutaba una query por cada item.
+ * Ahora hace un findMany batch para todos los productos a la vez.
+ */
 export async function validateStock(
   companyId: string,
   branchId: string,
   items: Array<{ productId: string; cantidad: number }>
 ): Promise<{ ok: boolean; errors: string[] }> {
+  if (items.length === 0) return { ok: true, errors: [] };
+
+  const productIds = items.map((i) => i.productId);
+
+  // Una sola query para todos los productos del lote
+  const invProducts = await prisma.inventoryProduct.findMany({
+    where: { productId: { in: productIds } },
+    include: {
+      stocks: { where: { branchId, companyId } },
+      product: { select: { descripcion: true, codigoPrincipal: true } },
+    },
+  });
+
+  // Indexar por productId para lookup O(1)
+  const invMap = new Map(invProducts.map((ip) => [ip.productId, ip]));
+
   const errors: string[] = [];
 
   for (const item of items) {
-    const invProduct = await prisma.inventoryProduct.findUnique({
-      where: { productId: item.productId },
-      include: {
-        stocks: { where: { branchId, companyId } },
-        product: { select: { descripcion: true, codigoPrincipal: true } },
-      },
-    });
-
+    const invProduct = invMap.get(item.productId);
     if (!invProduct?.tracksInventory) continue;
 
     const disponible = invProduct.stocks[0] ? Number(invProduct.stocks[0].cantidad) : 0;
@@ -67,7 +80,7 @@ export async function applyMovement(params: ApplyMovementParams): Promise<void> 
     tx,
   } = params;
 
-  // 1. Leer stock actual con FOR UPDATE implícito (Prisma usa SELECT en la tx)
+  // 1. Leer stock actual
   const existing = await tx.stock.findUnique({
     where: { branchId_inventoryProductId: { branchId, inventoryProductId } },
   });
@@ -88,8 +101,19 @@ export async function applyMovement(params: ApplyMovementParams): Promise<void> 
       data: { cantidad: nuevoStock },
     });
   } else {
+    // Al crear el registro Stock, hereda stockMinimo global del InventoryProduct
+    const invProductForMin = await tx.inventoryProduct.findUnique({
+      where: { id: inventoryProductId },
+      select: { stockMinimo: true },
+    });
     await tx.stock.create({
-      data: { companyId, branchId, inventoryProductId, cantidad: nuevoStock },
+      data: {
+        companyId,
+        branchId,
+        inventoryProductId,
+        cantidad: nuevoStock,
+        stockMinimo: invProductForMin?.stockMinimo ?? 0,
+      },
     });
   }
 
@@ -101,9 +125,10 @@ export async function applyMovement(params: ApplyMovementParams): Promise<void> 
     });
     const costoActual = Number(invProduct.costoPromedio);
     const stockTotal = stockActual + delta;
-    const nuevoCosto = stockTotal > 0
-      ? (stockActual * costoActual + delta * costoUnitario) / stockTotal
-      : costoUnitario;
+    const nuevoCosto =
+      stockTotal > 0
+        ? (stockActual * costoActual + delta * costoUnitario) / stockTotal
+        : costoUnitario;
 
     await tx.inventoryProduct.update({
       where: { id: inventoryProductId },
@@ -161,12 +186,17 @@ export async function deductFromInvoice(params: {
   });
 }
 
+/**
+ * D-02: Corregido costoUnitario en reversión de factura.
+ * Antes usaba `detail.precioUnitario` (precio de VENTA), lo que corrompía el
+ * costo promedio ponderado al recalcularlo con un valor incorrecto.
+ * Ahora usa el `costoPromedio` actual del InventoryProduct (precio de COSTO).
+ */
 export async function revertFromInvoice(params: {
   companyId: string;
   branchId: string;
   productId: string;
   cantidad: number;
-  costoUnitario: number;
   referencia: string;
   referenciaId: string;
   userId: string;
@@ -176,16 +206,20 @@ export async function revertFromInvoice(params: {
 
   const invProduct = await tx.inventoryProduct.findUnique({
     where: { productId },
-    select: { id: true, tracksInventory: true },
+    select: { id: true, tracksInventory: true, costoPromedio: true },
   });
 
   if (!invProduct?.tracksInventory) return;
+
+  // D-02: Usar costoPromedio (costo real) en lugar del precio de venta.
+  const costoUnitario = Number(invProduct.costoPromedio);
 
   await applyMovement({
     ...rest,
     inventoryProductId: invProduct.id,
     delta: Math.abs(rest.cantidad),
     tipo: "ENTRADA",
+    costoUnitario,
     referencia: `REV-${rest.referencia}`,
     tx,
   });

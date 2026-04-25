@@ -7,8 +7,8 @@ import Button from "@/components/ui/Button";
 const APP_NAME = process.env.NEXT_PUBLIC_APP_NAME ?? "{APP_NAME}";
 
 export default function LoginPage() {
-  const [email, setEmail] = useState("admin@techsoluciones.com");
-  const [password, setPassword] = useState("admin123");
+  const [email, setEmail] = useState("admin@factura.test");
+  const [password, setPassword] = useState("Admin1234!");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
 

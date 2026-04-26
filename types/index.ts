@@ -129,14 +129,19 @@ export type CreateInvoiceDetailDTO = {
   tipoIva: "IVA_0" | "IVA_5" | "IVA_STANDARD" | "NO_APLICA";
 };
 
+export type InvoicePaymentDTO = {
+  formaPago: string; // Tabla 24 SRI
+  monto: number;
+  plazo?: number;
+  unidadTiempo?: string;
+};
+
 export type CreateInvoiceDTO = {
   clientId: string;
   fechaEmision?: string;
   details: CreateInvoiceDetailDTO[];
   observaciones?: string;
-  formaPago?: string;
-  montoPagado?: number;
-  vuelto?: number;
+  pagos: InvoicePaymentDTO[];
 };
 
 // ─── SRI Types ────────────────────────────────────────────────────────────────
@@ -149,6 +154,7 @@ export interface InvoiceForXML {
     client: Client;
     branch?: Branch | null; // F-05: Dirección de sucursal emisora
     details: (InvoiceDetail & { product?: Product | null })[];
+    payments: { formaPago: string; monto: number | { toString(): string } }[];
   };
 }
 

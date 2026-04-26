@@ -27,6 +27,7 @@ async function main() {
         tipoIva: "IVA_STANDARD",
       },
     ],
+    pagos: [{ formaPago: "01", monto: 11.20 }],
   });
   console.log(`   Created: ${invoice.id}  secuencial: ${invoice.secuencial}`);
 

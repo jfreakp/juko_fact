@@ -161,6 +161,7 @@ export const invoiceRepository = {
         client: true,
         branch: true,
         details: { include: { product: true }, orderBy: { orden: "asc" } },
+        payments: { orderBy: { orden: "asc" } },
         sriResponses: { orderBy: { createdAt: "desc" } },
       },
     });
@@ -227,17 +228,24 @@ export const invoiceRepository = {
         branchId: branchId ?? null,
         fechaEmision,
         observaciones: dto.observaciones,
-        formaPago: dto.formaPago ?? "01",
-        montoPagado: dto.montoPagado,
-        vuelto: dto.vuelto,
         ...totals,
         details: { create: detailsData },
+        payments: {
+          create: dto.pagos.map((p, i) => ({
+            formaPago: p.formaPago,
+            monto: p.monto,
+            plazo: p.plazo ?? null,
+            unidadTiempo: p.unidadTiempo ?? null,
+            orden: i,
+          })),
+        },
       },
       include: {
         company: true,
         client: true,
         branch: true,
         details: { include: { product: true } },
+        payments: { orderBy: { orden: "asc" } },
       },
     });
   },
@@ -314,17 +322,24 @@ export const invoiceRepository = {
         branchId: branchId ?? null,
         fechaEmision,
         observaciones: dto.observaciones,
-        formaPago: dto.formaPago ?? "01",
-        montoPagado: dto.montoPagado,
-        vuelto: dto.vuelto,
         ...totals,
         details: { create: detailsData },
+        payments: {
+          create: dto.pagos.map((p, i) => ({
+            formaPago: p.formaPago,
+            monto: p.monto,
+            plazo: p.plazo ?? null,
+            unidadTiempo: p.unidadTiempo ?? null,
+            orden: i,
+          })),
+        },
       },
       include: {
         company: true,
         client: true,
         branch: true,
         details: { include: { product: true } },
+        payments: { orderBy: { orden: "asc" } },
       },
     });
   },

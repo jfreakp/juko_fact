@@ -276,11 +276,6 @@ model Invoice {
   branchId            String?
   branch              Branch?           @relation(fields: [branchId], references: [id], onDelete: SetNull)
 
-  // Pago
-  formaPago           String            @default("01") // Tabla 24: 01=efectivo, 17=transferencia, 19=tarjeta crédito
-  montoPagado         Decimal?          @db.Decimal(12, 2)
-  vuelto              Decimal?          @db.Decimal(12, 2)
-
   // SRI data
   estado              EstadoComprobante @default(PENDIENTE)
   xmlGenerado         String?           @db.Text
@@ -297,6 +292,7 @@ model Invoice {
   updatedAt           DateTime          @updatedAt
 
   details             InvoiceDetail[]
+  payments            InvoicePayment[]
   sriResponses        SRIResponse[]
 
   @@unique([companyId, secuencial])
@@ -305,6 +301,20 @@ model Invoice {
   @@index([estado])
   @@index([claveAcceso])
   @@map("invoices")
+}
+
+model InvoicePayment {
+  id          String   @id @default(cuid())
+  invoiceId   String
+  invoice     Invoice  @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+  formaPago   String   // Tabla 24 SRI: 01=efectivo, 17=transferencia, 19=tarjeta crédito, 20=otros
+  monto       Decimal  @db.Decimal(12, 2)
+  plazo       Int?     // días de plazo (para crédito)
+  unidadTiempo String? // "dias" | "meses" (para crédito)
+  orden       Int      @default(0)
+
+  @@index([invoiceId])
+  @@map("invoice_payments")
 }
 
 model InvoiceDetail {

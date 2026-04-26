@@ -35,6 +35,17 @@ const detailSchema = z
     { message: "El descuento no puede exceder el subtotal de la línea", path: ["descuento"] }
   );
 
+const pagoSchema = z.object({
+  formaPago: z.enum(FORMAS_PAGO_VALIDAS, {
+    error: `Forma de pago inválida. Valores válidos: ${FORMAS_PAGO_VALIDAS.join(", ")}`,
+  }),
+  monto: z
+    .number()
+    .positive("El monto de pago debe ser mayor a 0"),
+  plazo: z.number().int().min(0).optional(),
+  unidadTiempo: z.string().optional(),
+});
+
 const invoiceSchema = z.object({
   clientId: z.string().min(1, "Cliente requerido"),
   // E-03: Validar formato de fecha — la restricción de fecha futura se hace en el servicio
@@ -44,17 +55,7 @@ const invoiceSchema = z.object({
     .optional(),
   details: z.array(detailSchema).min(1, "Se requiere al menos un detalle"),
   observaciones: z.string().optional(),
-  // Validar contra Tabla 24 SRI
-  formaPago: z
-    .enum(FORMAS_PAGO_VALIDAS, {
-      error: `Forma de pago inválida. Valores válidos: ${FORMAS_PAGO_VALIDAS.join(", ")}`,
-    })
-    .optional(),
-  montoPagado: z
-    .number()
-    .min(0, "El monto pagado no puede ser negativo")
-    .multipleOf(0.01, "Máximo 2 decimales permitidos")
-    .optional(),
+  pagos: z.array(pagoSchema).min(1, "Se requiere al menos una forma de pago"),
 });
 
 export async function GET(req: NextRequest) {

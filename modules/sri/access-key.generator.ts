@@ -32,7 +32,7 @@ export function generateAccessKey(params: {
     tipoComprobante = "01",
     ruc,
     ambiente,
-    estab,
+    estab, 
     ptoEmi,
     secuencial,
     tipoEmision = "1",

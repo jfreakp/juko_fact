@@ -89,6 +89,418 @@ const TIPO_IDENTIF_LABEL: Record<string, string> = {
   CONSUMIDOR_FINAL: "CF",
 };
 
+// ── Add Client Modal ─────────────────────────────────────────────────────────
+interface AddClientModalProps {
+  initialIdentificacion: string;
+  onClose: () => void;
+  onCreated: (client: Client) => void;
+}
+
+function detectTipoIdentif(id: string): "CEDULA" | "RUC" | "PASAPORTE" {
+  const clean = id.replace(/\D/g, "");
+  if (clean.length === 10) return "CEDULA";
+  if (clean.length === 13) return "RUC";
+  return "PASAPORTE";
+}
+
+function AddClientModal({ initialIdentificacion, onClose, onCreated }: AddClientModalProps) {
+  const [identificacion, setIdentificacion] = useState(initialIdentificacion);
+  const [tipoIdentif, setTipoIdentif] = useState<"CEDULA" | "RUC" | "PASAPORTE">(
+    detectTipoIdentif(initialIdentificacion)
+  );
+  const [razonSocial, setRazonSocial] = useState("");
+  const [email, setEmail] = useState("");
+  const [telefono, setTelefono] = useState("");
+  const [direccion, setDireccion] = useState("");
+  const [searching, setSearching] = useState(false);
+  const [sriMsg, setSriMsg] = useState<{ type: "ok" | "warn" | "err"; text: string } | null>(null);
+  const [saving, setSaving] = useState(false);
+  const [saveError, setSaveError] = useState("");
+  const { error: toastError } = useToast();
+
+  async function buscarSRI() {
+    const id = identificacion.trim();
+    if (!id) return;
+    setSearching(true);
+    setSriMsg(null);
+    try {
+      const res = await fetch(`/api/sri/contribuyente?identificacion=${encodeURIComponent(id)}`);
+      const data = await res.json();
+      if (!data.success) {
+        setSriMsg({ type: "err", text: data.error ?? "Error al consultar el SRI" });
+        return;
+      }
+      const contrib = data.data?.contribuyente;
+      const nombre: string = contrib?.nombreComercial ?? contrib?.denominacion ?? "";
+      if (nombre) {
+        setRazonSocial(nombre);
+        setSriMsg({ type: "ok", text: `Contribuyente encontrado: ${nombre}` });
+      } else {
+        setSriMsg({ type: "warn", text: "No se encontró nombre en el SRI. Ingrese la razón social manualmente." });
+      }
+      // Auto-detectar tipo por longitud real
+      setTipoIdentif(detectTipoIdentif(id));
+    } catch {
+      setSriMsg({ type: "err", text: "No se pudo conectar con el SRI" });
+    } finally {
+      setSearching(false);
+    }
+  }
+
+  async function handleSave() {
+    const id = identificacion.trim();
+    const nombre = razonSocial.trim();
+    if (!id) { setSaveError("La identificación es requerida"); return; }
+    if (!nombre) { setSaveError("La razón social es requerida"); return; }
+    setSaveError("");
+    setSaving(true);
+    try {
+      const res = await fetch("/api/clients", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          tipoIdentif,
+          identificacion: id,
+          razonSocial: nombre,
+          email: email.trim() || undefined,
+          telefono: telefono.trim() || undefined,
+          direccion: direccion.trim() || undefined,
+        }),
+      });
+      const data = await res.json();
+      if (!data.success) {
+        setSaveError(data.error ?? "Error al guardar");
+        return;
+      }
+      onCreated({
+        id: data.data.id,
+        razonSocial: data.data.razonSocial,
+        identificacion: data.data.identificacion,
+        tipoIdentif: data.data.tipoIdentif,
+      });
+    } catch {
+      toastError("Error de conexión al guardar el cliente");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  const inputStyle: React.CSSProperties = {
+    background: "var(--surface-white)",
+    color: "var(--text-base)",
+    border: "2px solid var(--border-subtle)",
+    borderRadius: "10px",
+    padding: "8px 12px",
+    fontSize: "13px",
+    fontWeight: 600,
+    outline: "none",
+    width: "100%",
+    transition: "border-color 0.15s",
+  };
+
+  const labelStyle: React.CSSProperties = {
+    fontSize: "10px",
+    fontWeight: 700,
+    letterSpacing: "0.12em",
+    textTransform: "uppercase",
+    color: "var(--text-secondary)",
+    display: "block",
+    marginBottom: "4px",
+  };
+
+  return createPortal(
+    <div
+      style={{
+        position: "fixed",
+        inset: 0,
+        zIndex: 10000,
+        background: "rgba(0,0,0,0.45)",
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        padding: "16px",
+      }}
+      onMouseDown={(e) => { if (e.target === e.currentTarget) onClose(); }}
+    >
+      <div
+        style={{
+          background: "var(--surface-white)",
+          border: "2px solid var(--border-strong)",
+          borderRadius: "16px",
+          width: "100%",
+          maxWidth: "480px",
+          boxShadow: "0 20px 60px rgba(0,0,0,0.2)",
+        }}
+      >
+        {/* Header */}
+        <div
+          style={{
+            padding: "16px 20px",
+            borderBottom: "1px solid var(--border-subtle)",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "space-between",
+          }}
+        >
+          <div>
+            <p style={{ fontSize: "13px", fontWeight: 800, color: "var(--text-base)", margin: 0 }}>
+              Agregar cliente
+            </p>
+            <p style={{ fontSize: "11px", color: "var(--text-muted)", margin: "2px 0 0" }}>
+              Busca en el SRI por cédula o RUC para obtener el nombre
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={onClose}
+            style={{
+              width: 28,
+              height: 28,
+              borderRadius: 8,
+              border: "none",
+              background: "var(--surface-low)",
+              color: "var(--text-muted)",
+              cursor: "pointer",
+              fontSize: 16,
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              fontWeight: 700,
+            }}
+          >
+            ×
+          </button>
+        </div>
+
+        {/* Body */}
+        <div style={{ padding: "20px", display: "flex", flexDirection: "column", gap: "14px" }}>
+          {/* Identificación + Buscar SRI */}
+          <div>
+            <label style={labelStyle}>Cédula / RUC / Pasaporte</label>
+            <div style={{ display: "flex", gap: "8px" }}>
+              <input
+                style={{ ...inputStyle, flex: 1 }}
+                placeholder="Ej: 1105989576001"
+                value={identificacion}
+                onChange={(e) => {
+                  setIdentificacion(e.target.value);
+                  setTipoIdentif(detectTipoIdentif(e.target.value));
+                  setSriMsg(null);
+                }}
+                onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); buscarSRI(); } }}
+                onFocus={(e) => (e.currentTarget.style.borderColor = "var(--primary-focus)")}
+                onBlur={(e) => (e.currentTarget.style.borderColor = "var(--border-subtle)")}
+              />
+              <button
+                type="button"
+                onClick={buscarSRI}
+                disabled={searching || !identificacion.trim()}
+                style={{
+                  padding: "8px 14px",
+                  borderRadius: "10px",
+                  border: "2px solid var(--primary-dim)",
+                  background: "var(--primary)",
+                  color: "var(--on-primary)",
+                  fontSize: "11px",
+                  fontWeight: 800,
+                  cursor: searching || !identificacion.trim() ? "not-allowed" : "pointer",
+                  opacity: searching || !identificacion.trim() ? 0.6 : 1,
+                  whiteSpace: "nowrap",
+                  display: "flex",
+                  alignItems: "center",
+                  gap: "6px",
+                }}
+              >
+                {searching && (
+                  <svg className="animate-spin" style={{ width: 12, height: 12 }} fill="none" viewBox="0 0 24 24">
+                    <circle style={{ opacity: 0.25 }} cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                    <path style={{ opacity: 0.75 }} fill="currentColor" d="M4 12a8 8 0 018-8v8z" />
+                  </svg>
+                )}
+                Consultar SRI
+              </button>
+            </div>
+
+            {/* SRI feedback message */}
+            {sriMsg && (
+              <div
+                style={{
+                  marginTop: 8,
+                  padding: "8px 12px",
+                  borderRadius: 8,
+                  fontSize: 11,
+                  fontWeight: 600,
+                  background:
+                    sriMsg.type === "ok"
+                      ? "var(--success-bg)"
+                      : sriMsg.type === "warn"
+                      ? "#fefce8"
+                      : "var(--error-bg)",
+                  color:
+                    sriMsg.type === "ok"
+                      ? "var(--success-text)"
+                      : sriMsg.type === "warn"
+                      ? "#854d0e"
+                      : "var(--error-text)",
+                  border: `1px solid ${
+                    sriMsg.type === "ok"
+                      ? "var(--success-text)"
+                      : sriMsg.type === "warn"
+                      ? "#fde047"
+                      : "var(--error-strong)"
+                  }`,
+                }}
+              >
+                {sriMsg.text}
+              </div>
+            )}
+          </div>
+
+          {/* Tipo identificación */}
+          <div>
+            <label style={labelStyle}>Tipo de identificación</label>
+            <select
+              style={{ ...inputStyle, cursor: "pointer" }}
+              value={tipoIdentif}
+              onChange={(e) => setTipoIdentif(e.target.value as "CEDULA" | "RUC" | "PASAPORTE")}
+              onFocus={(e) => (e.currentTarget.style.borderColor = "var(--primary-focus)")}
+              onBlur={(e) => (e.currentTarget.style.borderColor = "var(--border-subtle)")}
+            >
+              <option value="CEDULA">Cédula</option>
+              <option value="RUC">RUC</option>
+              <option value="PASAPORTE">Pasaporte</option>
+            </select>
+          </div>
+
+          {/* Razón social */}
+          <div>
+            <label style={labelStyle}>Razón social / Nombre *</label>
+            <input
+              style={inputStyle}
+              placeholder="Nombre del cliente"
+              value={razonSocial}
+              onChange={(e) => setRazonSocial(e.target.value)}
+              onFocus={(e) => (e.currentTarget.style.borderColor = "var(--primary-focus)")}
+              onBlur={(e) => (e.currentTarget.style.borderColor = "var(--border-subtle)")}
+            />
+          </div>
+
+          {/* Email */}
+          <div>
+            <label style={labelStyle}>Correo electrónico</label>
+            <input
+              type="email"
+              style={inputStyle}
+              placeholder="cliente@email.com (opcional)"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              onFocus={(e) => (e.currentTarget.style.borderColor = "var(--primary-focus)")}
+              onBlur={(e) => (e.currentTarget.style.borderColor = "var(--border-subtle)")}
+            />
+          </div>
+
+          {/* Teléfono + Dirección (2 cols) */}
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "12px" }}>
+            <div>
+              <label style={labelStyle}>Teléfono</label>
+              <input
+                style={inputStyle}
+                placeholder="0999999999"
+                value={telefono}
+                onChange={(e) => setTelefono(e.target.value)}
+                onFocus={(e) => (e.currentTarget.style.borderColor = "var(--primary-focus)")}
+                onBlur={(e) => (e.currentTarget.style.borderColor = "var(--border-subtle)")}
+              />
+            </div>
+            <div>
+              <label style={labelStyle}>Dirección</label>
+              <input
+                style={inputStyle}
+                placeholder="Dirección (opcional)"
+                value={direccion}
+                onChange={(e) => setDireccion(e.target.value)}
+                onFocus={(e) => (e.currentTarget.style.borderColor = "var(--primary-focus)")}
+                onBlur={(e) => (e.currentTarget.style.borderColor = "var(--border-subtle)")}
+              />
+            </div>
+          </div>
+
+          {saveError && (
+            <div
+              style={{
+                padding: "8px 12px",
+                borderRadius: 8,
+                fontSize: 11,
+                fontWeight: 600,
+                background: "var(--error-bg)",
+                color: "var(--error-text)",
+                border: "1px solid var(--error-strong)",
+              }}
+            >
+              {saveError}
+            </div>
+          )}
+        </div>
+
+        {/* Footer */}
+        <div
+          style={{
+            padding: "14px 20px",
+            borderTop: "1px solid var(--border-subtle)",
+            display: "flex",
+            gap: "8px",
+            justifyContent: "flex-end",
+          }}
+        >
+          <button
+            type="button"
+            onClick={onClose}
+            style={{
+              padding: "8px 16px",
+              borderRadius: 10,
+              border: "2px solid var(--border-subtle)",
+              background: "var(--surface-low)",
+              color: "var(--text-muted)",
+              fontSize: 12,
+              fontWeight: 700,
+              cursor: "pointer",
+            }}
+          >
+            Cancelar
+          </button>
+          <button
+            type="button"
+            onClick={handleSave}
+            disabled={saving}
+            style={{
+              padding: "8px 20px",
+              borderRadius: 10,
+              border: "2px solid var(--primary-dim)",
+              background: saving ? "var(--surface-highest)" : "var(--primary)",
+              color: saving ? "var(--text-muted)" : "var(--on-primary)",
+              fontSize: 12,
+              fontWeight: 800,
+              cursor: saving ? "not-allowed" : "pointer",
+              display: "flex",
+              alignItems: "center",
+              gap: 6,
+            }}
+          >
+            {saving && (
+              <svg className="animate-spin" style={{ width: 12, height: 12 }} fill="none" viewBox="0 0 24 24">
+                <circle style={{ opacity: 0.25 }} cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                <path style={{ opacity: 0.75 }} fill="currentColor" d="M4 12a8 8 0 018-8v8z" />
+              </svg>
+            )}
+            Guardar cliente
+          </button>
+        </div>
+      </div>
+    </div>,
+    document.body
+  );
+}
+
 // ── Client Picker ────────────────────────────────────────────────────────────
 interface ClientPickerProps {
   value: Client | null;
@@ -103,6 +515,7 @@ function ClientPicker({ value, onChange }: ClientPickerProps) {
   const [cursor, setCursor] = useState(0);
   const [dropdownStyle, setDropdownStyle] = useState<React.CSSProperties>({});
   const [mounted, setMounted] = useState(false);
+  const [showAddModal, setShowAddModal] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
   const dropdownRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -280,9 +693,28 @@ function ClientPicker({ value, onChange }: ClientPickerProps) {
           <p className="text-sm font-medium" style={{ color: "var(--text-muted)" }}>Buscando...</p>
         </div>
       ) : results.length === 0 ? (
-        <div className="px-4 py-8 text-center">
+        <div className="px-4 py-6 text-center">
           <p className="text-sm font-bold mb-1" style={{ color: "var(--text-base)" }}>Sin resultados</p>
-          <p className="text-xs" style={{ color: "var(--text-muted)" }}>No se encontró &ldquo;{query}&rdquo;</p>
+          <p className="text-xs mb-4" style={{ color: "var(--text-muted)" }}>No se encontró &ldquo;{query}&rdquo;</p>
+          <button
+            type="button"
+            onMouseDown={(e) => {
+              e.preventDefault();
+              setOpen(false);
+              setShowAddModal(true);
+            }}
+            className="inline-flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold tracking-wide transition-colors"
+            style={{
+              background: "var(--primary)",
+              color: "var(--on-primary)",
+              border: "2px solid var(--primary-dim)",
+            }}
+          >
+            <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" />
+            </svg>
+            Agregar cliente nuevo
+          </button>
         </div>
       ) : (
         results.map((c, i) => (
@@ -324,33 +756,48 @@ function ClientPicker({ value, onChange }: ClientPickerProps) {
   );
 
   return (
-    <div ref={containerRef} className="relative">
-      <div
-        className="flex items-center gap-2 px-3 py-2.5 rounded-xl cursor-text"
-        style={{
-          background: "var(--surface-white)",
-          border: open ? "2px solid var(--primary-focus)" : "2px solid var(--border-subtle)",
-        }}
-        onClick={openDropdown}
-      >
-        <svg className="w-4 h-4 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}
-          style={{ color: "var(--text-muted)" }}>
-          <path strokeLinecap="round" strokeLinejoin="round"
-            d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z" />
-        </svg>
-        <span className="flex-1 text-sm font-medium" style={{ color: "var(--text-muted)" }}>
-          Buscar cliente por cédula o nombre...
-        </span>
-        <svg
-          className="w-3.5 h-3.5 flex-shrink-0 transition-transform"
-          style={{ color: "var(--text-muted)", transform: open ? "rotate(180deg)" : "rotate(0deg)" }}
-          fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}
+    <>
+      <div ref={containerRef} className="relative">
+        <div
+          className="flex items-center gap-2 px-3 py-2.5 rounded-xl cursor-text"
+          style={{
+            background: "var(--surface-white)",
+            border: open ? "2px solid var(--primary-focus)" : "2px solid var(--border-subtle)",
+          }}
+          onClick={openDropdown}
         >
-          <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
-        </svg>
+          <svg className="w-4 h-4 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}
+            style={{ color: "var(--text-muted)" }}>
+            <path strokeLinecap="round" strokeLinejoin="round"
+              d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z" />
+          </svg>
+          <span className="flex-1 text-sm font-medium" style={{ color: "var(--text-muted)" }}>
+            Buscar cliente por cédula o nombre...
+          </span>
+          <svg
+            className="w-3.5 h-3.5 flex-shrink-0 transition-transform"
+            style={{ color: "var(--text-muted)", transform: open ? "rotate(180deg)" : "rotate(0deg)" }}
+            fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}
+          >
+            <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
+          </svg>
+        </div>
+        {open && mounted && createPortal(dropdownContent, document.body)}
       </div>
-      {open && mounted && createPortal(dropdownContent, document.body)}
-    </div>
+
+      {showAddModal && mounted && (
+        <AddClientModal
+          initialIdentificacion={query}
+          onClose={() => setShowAddModal(false)}
+          onCreated={(client) => {
+            onChange(client);
+            setShowAddModal(false);
+            setQuery("");
+            setResults([]);
+          }}
+        />
+      )}
+    </>
   );
 }
 

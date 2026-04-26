@@ -1176,8 +1176,12 @@ export default function NewInvoicePage() {
   const [observaciones, setObservaciones] = useState("");
   const [lines, setLines] = useState<DetailLine[]>([emptyLine()]);
   const [saving, setSaving] = useState(false);
-  const [montoPagado, setMontoPagado] = useState("");
-  const [metodoPago, setMetodoPago] = useState<"01" | "17" | "19">("01");
+
+  type PagoCode = "01" | "17" | "19" | "20";
+  type PagoEntry = { id: string; formaPago: PagoCode; monto: string };
+  const [pagos, setPagos] = useState<PagoEntry[]>([
+    { id: crypto.randomUUID(), formaPago: "01", monto: "" },
+  ]);
 
   useEffect(() => {
     fetch("/api/products").then((r) => r.json()).then((p) => {
@@ -1263,15 +1267,45 @@ export default function NewInvoicePage() {
   );
 
   const totalFactura = Math.round(totals.total * 100) / 100;
-  const montoPagadoNum = Math.round((parseFloat(montoPagado) || 0) * 100) / 100;
-  const vuelto = Math.round((montoPagadoNum - totalFactura) * 100) / 100;
-  const isInsuficiente = montoPagadoNum > 0 && montoPagadoNum < totalFactura;
-  const canFinish = montoPagado !== "" && montoPagadoNum >= totalFactura;
+  const sumaPagos = Math.round(pagos.reduce((acc, p) => acc + (parseFloat(p.monto) || 0), 0) * 100) / 100;
+  const pendiente = Math.round((totalFactura - sumaPagos) * 100) / 100;
+  const hayCash = pagos.some((p) => p.formaPago === "01");
+  // canFinish: suma exacta, O bien suma >= total con efectivo (el exceso es vuelto)
+  const canFinish = pagos.every((p) => p.monto !== "") &&
+    (Math.abs(pendiente) < 0.01 || (pendiente < 0 && hayCash));
 
-  function handleMontoPagadoChange(value: string) {
-    // Allow only valid numeric input with up to 2 decimal places
+
+  const METODOS: { code: PagoCode; label: string }[] = [
+    { code: "01", label: "Efectivo" },
+    { code: "17", label: "Transferencia" },
+    { code: "19", label: "Tarjeta" },
+    { code: "20", label: "Otro" },
+  ];
+
+  function addPago() {
+    setPagos((prev) => [
+      ...prev,
+      { id: crypto.randomUUID(), formaPago: "01", monto: "" },
+    ]);
+  }
+
+  function removePago(id: string) {
+    setPagos((prev) => (prev.length > 1 ? prev.filter((p) => p.id !== id) : prev));
+  }
+
+  function updatePago(id: string, updates: Partial<PagoEntry>) {
+    setPagos((prev) => prev.map((p) => (p.id === id ? { ...p, ...updates } : p)));
+  }
+
+  function setPagoMonto(id: string, value: string) {
     if (value === "" || /^\d+(\.\d{0,2})?$/.test(value)) {
-      setMontoPagado(value);
+      updatePago(id, { monto: value });
+    }
+  }
+
+  function completarConPendiente(id: string) {
+    if (pendiente > 0) {
+      updatePago(id, { monto: pendiente.toFixed(2) });
     }
   }
 
@@ -1290,9 +1324,9 @@ export default function NewInvoicePage() {
     try {
       if (!canFinish) {
         toastError(
-          montoPagado === ""
-            ? "Ingrese el monto pagado por el cliente"
-            : "Monto insuficiente para cubrir el total de la factura"
+          pagos.every((p) => p.monto === "")
+            ? "Ingrese los montos de pago"
+            : `Pendiente por cubrir: $${pendiente.toFixed(2)}`
         );
         return;
       }
@@ -1304,8 +1338,24 @@ export default function NewInvoicePage() {
           clientId: selectedClient.id,
           fechaEmision,
           observaciones,
-          formaPago: metodoPago,
-          montoPagado: montoPagadoNum,
+          // Para el SRI: recortar el efectivo al monto exacto necesario
+          // (el exceso es vuelto al cliente — no va en el XML)
+          pagos: (() => {
+            let restante = totalFactura;
+            return pagos
+              .filter((p) => p.monto !== "")
+              .map((p) => {
+                const raw = parseFloat(p.monto) || 0;
+                if (p.formaPago === "01") {
+                  const monto = Math.round(Math.min(raw, Math.max(0, restante)) * 100) / 100;
+                  restante = Math.round((restante - monto) * 100) / 100;
+                  return { formaPago: p.formaPago, monto };
+                }
+                restante = Math.round((restante - raw) * 100) / 100;
+                return { formaPago: p.formaPago, monto: raw };
+              })
+              .filter((p) => p.monto > 0);
+          })(),
           details: lines.map((l) => ({
             productId: l.productId,
             codigoPrincipal: l.codigoPrincipal,
@@ -1447,162 +1497,120 @@ export default function NewInvoicePage() {
                 Pago
               </p>
 
-              {/* Método de pago */}
-              <div>
-                <p className="text-[9px] font-bold tracking-widest uppercase mb-2" style={{ color: "var(--text-muted)" }}>
-                  Método
-                </p>
-                <div className="grid grid-cols-3 gap-1">
-                  {(
-                    [
-                      { code: "01", label: "Efectivo" },
-                      { code: "17", label: "Transfer." },
-                      { code: "19", label: "Tarjeta" },
-                    ] as const
-                  ).map(({ code, label }) => (
-                    <button
-                      key={code}
-                      type="button"
-                      onClick={() => setMetodoPago(code)}
-                      className="py-1.5 rounded-lg text-[10px] font-bold tracking-wide transition-colors"
-                      style={
-                        metodoPago === code
-                          ? { background: "var(--primary)", color: "var(--on-primary)", border: "2px solid var(--primary-dim)" }
-                          : { background: "var(--surface-low)", color: "var(--text-muted)", border: "2px solid var(--border-subtle)" }
-                      }
-                    >
-                      {label}
-                    </button>
-                  ))}
-                </div>
+              {/* Filas de pago */}
+              <div className="space-y-2">
+                {pagos.map((pago, idx) => (
+                  <div key={pago.id} className="space-y-1.5">
+                    {/* Selector de método */}
+                    <div className="grid grid-cols-4 gap-1">
+                      {METODOS.map(({ code, label }) => {
+                        const usadoEnOtraFila = pagos.some((p) => p.id !== pago.id && p.formaPago === code);
+                        const activo = pago.formaPago === code;
+                        return (
+                          <button
+                            key={code}
+                            type="button"
+                            disabled={usadoEnOtraFila}
+                            onClick={() => updatePago(pago.id, { formaPago: code })}
+                            className="py-1 rounded-md text-[9px] font-bold tracking-wide transition-colors"
+                            style={
+                              activo
+                                ? { background: "var(--primary)", color: "var(--on-primary)", border: "2px solid var(--primary-dim)" }
+                                : usadoEnOtraFila
+                                ? { background: "var(--surface-low)", color: "var(--border-subtle)", border: "2px solid var(--border-subtle)", cursor: "not-allowed", opacity: 0.4 }
+                                : { background: "var(--surface-low)", color: "var(--text-muted)", border: "2px solid var(--border-subtle)" }
+                            }
+                          >
+                            {label}
+                          </button>
+                        );
+                      })}
+                    </div>
+
+                    {/* Input monto + quitar */}
+                    <div className="flex gap-1.5">
+                      <div className="relative flex-1">
+                        <span
+                          className="absolute left-3 top-1/2 -translate-y-1/2 text-sm font-bold"
+                          style={{ color: "var(--text-muted)" }}
+                        >
+                          $
+                        </span>
+                        <input
+                          type="text"
+                          inputMode="decimal"
+                          placeholder="0.00"
+                          value={pago.monto}
+                          onChange={(e) => setPagoMonto(pago.id, e.target.value)}
+                          className="w-full pl-7 pr-3 py-2 rounded-lg text-sm font-bold text-right outline-none transition-colors"
+                          style={{
+                            background: "var(--surface-white)",
+                            border: "2px solid var(--border-subtle)",
+                            color: "var(--text-base)",
+                          }}
+                          onFocus={(e) => { e.currentTarget.style.borderColor = "var(--primary-focus)"; }}
+                          onBlur={(e) => { e.currentTarget.style.borderColor = "var(--border-subtle)"; }}
+                        />
+                      </div>
+                      {/* Botón exacto (rellena con pendiente) */}
+                      {pendiente > 0 && (
+                        <button
+                          type="button"
+                          onClick={() => completarConPendiente(pago.id)}
+                          className="px-2.5 rounded-lg text-[9px] font-bold tracking-wide transition-colors"
+                          style={{ background: "var(--surface-low)", color: "var(--text-muted)", border: "2px solid var(--border-subtle)" }}
+                          title={`Completar con $${pendiente.toFixed(2)}`}
+                        >
+                          Exacto
+                        </button>
+                      )}
+                      {/* Quitar fila */}
+                      {pagos.length > 1 && (
+                        <button
+                          type="button"
+                          onClick={() => removePago(pago.id)}
+                          className="px-2.5 rounded-lg text-[11px] font-bold transition-colors"
+                          style={{ background: "var(--error-bg)", color: "var(--error-text)", border: "2px solid transparent" }}
+                        >
+                          ✕
+                        </button>
+                      )}
+                    </div>
+
+                    {/* Separador entre filas */}
+                    {idx < pagos.length - 1 && (
+                      <div style={{ borderTop: "1px solid var(--surface-highest)", marginTop: "4px" }} />
+                    )}
+                  </div>
+                ))}
               </div>
 
-              {/* Monto pagado */}
-              <div>
-                <p className="text-[9px] font-bold tracking-widest uppercase mb-1.5" style={{ color: "var(--text-muted)" }}>
-                  Monto pagado
-                </p>
-                <div className="relative">
-                  <span
-                    className="absolute left-3 top-1/2 -translate-y-1/2 text-sm font-bold"
-                    style={{ color: "var(--text-muted)" }}
-                  >
-                    $
-                  </span>
-                  <input
-                    type="text"
-                    inputMode="decimal"
-                    placeholder="0.00"
-                    value={montoPagado}
-                    onChange={(e) => handleMontoPagadoChange(e.target.value)}
-                    className="w-full pl-7 pr-3 py-2 rounded-lg text-sm font-bold text-right outline-none transition-colors"
-                    style={{
-                      background: "var(--surface-white)",
-                      border: isInsuficiente
-                        ? "2px solid var(--error-strong)"
-                        : montoPagado && canFinish
-                        ? "2px solid #22a55b"
-                        : "2px solid var(--border-subtle)",
-                      color: "var(--text-base)",
-                    }}
-                    onFocus={(e) => {
-                      if (!isInsuficiente && !(montoPagado && canFinish))
-                        e.currentTarget.style.borderColor = "var(--primary-focus)";
-                    }}
-                    onBlur={(e) => {
-                      if (!isInsuficiente && !(montoPagado && canFinish))
-                        e.currentTarget.style.borderColor = "var(--border-subtle)";
-                    }}
-                  />
-                </div>
-
-                {/* Quick buttons */}
-                <div className="flex gap-1.5 mt-1.5">
-                  <button
-                    type="button"
-                    onClick={() => setMontoPagado(totalFactura.toFixed(2))}
-                    className="flex-1 py-1 rounded-md text-[9px] font-bold tracking-wide transition-colors"
-                    style={{
-                      background: "var(--surface-low)",
-                      color: "var(--text-muted)",
-                      border: "1px solid var(--border-subtle)",
-                    }}
-                    onMouseEnter={(e) => {
-                      (e.currentTarget as HTMLElement).style.background = "var(--surface-highest)";
-                      (e.currentTarget as HTMLElement).style.color = "var(--text-base)";
-                    }}
-                    onMouseLeave={(e) => {
-                      (e.currentTarget as HTMLElement).style.background = "var(--surface-low)";
-                      (e.currentTarget as HTMLElement).style.color = "var(--text-muted)";
-                    }}
-                  >
-                    Exacto
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() =>
-                      setMontoPagado(Math.ceil(totalFactura).toFixed(2))
-                    }
-                    className="flex-1 py-1 rounded-md text-[9px] font-bold tracking-wide transition-colors"
-                    style={{
-                      background: "var(--surface-low)",
-                      color: "var(--text-muted)",
-                      border: "1px solid var(--border-subtle)",
-                    }}
-                    onMouseEnter={(e) => {
-                      (e.currentTarget as HTMLElement).style.background = "var(--surface-highest)";
-                      (e.currentTarget as HTMLElement).style.color = "var(--text-base)";
-                    }}
-                    onMouseLeave={(e) => {
-                      (e.currentTarget as HTMLElement).style.background = "var(--surface-low)";
-                      (e.currentTarget as HTMLElement).style.color = "var(--text-muted)";
-                    }}
-                  >
-                    Redondear $
-                  </button>
-                </div>
-              </div>
-
-              {/* Vuelto */}
-              <div
-                className="flex items-center justify-between rounded-lg px-3 py-2.5"
-                style={{
-                  background: isInsuficiente
-                    ? "var(--error-bg)"
-                    : montoPagado && canFinish
-                    ? "#dcfce7"
-                    : "var(--surface-low)",
-                }}
+              {/* Agregar método */}
+              <button
+                type="button"
+                onClick={addPago}
+                className="w-full py-1.5 rounded-lg text-[10px] font-bold tracking-wide transition-colors"
+                style={{ background: "var(--surface-low)", color: "var(--text-muted)", border: "2px dashed var(--border-subtle)" }}
               >
-                <span
-                  className="text-xs font-bold tracking-widest uppercase"
-                  style={{
-                    color: isInsuficiente
-                      ? "var(--error-text)"
-                      : montoPagado && canFinish
-                      ? "#166534"
-                      : "var(--text-muted)",
-                  }}
-                >
-                  {isInsuficiente ? "Monto insuficiente" : "Vuelto"}
-                </span>
-                <span
-                  className="text-sm font-black"
-                  style={{
-                    color: isInsuficiente
-                      ? "var(--error-strong)"
-                      : montoPagado && canFinish
-                      ? "#166534"
-                      : "var(--text-muted)",
-                  }}
-                >
-                  {isInsuficiente
-                    ? `-$${Math.abs(vuelto).toFixed(2)}`
-                    : montoPagado
-                    ? `$${vuelto.toFixed(2)}`
-                    : "—"}
-                </span>
-              </div>
+                + Agregar método de pago
+              </button>
+
+              {/* Estado del pago */}
+              {(() => {
+                const vuelto = canFinish && pendiente < -0.01 ? Math.abs(pendiente) : 0;
+                const excedenteSinCash = pendiente < -0.01 && !hayCash;
+                const faltan = pendiente > 0.01;
+                const bg  = canFinish ? "#dcfce7" : excedenteSinCash ? "#fef9c3" : faltan && sumaPagos > 0 ? "var(--error-bg)" : "var(--surface-low)";
+                const clr = canFinish ? "#166534" : excedenteSinCash ? "#854d0e" : faltan && sumaPagos > 0 ? "var(--error-strong)" : "var(--text-muted)";
+                const label = vuelto > 0 ? "Vuelto" : canFinish ? "Cubierto" : excedenteSinCash ? "Excedente" : "Pendiente";
+                const value = vuelto > 0 ? `$${vuelto.toFixed(2)}` : canFinish ? "✓" : excedenteSinCash ? `+$${Math.abs(pendiente).toFixed(2)}` : sumaPagos > 0 ? `-$${pendiente.toFixed(2)}` : "—";
+                return (
+                  <div className="flex items-center justify-between rounded-lg px-3 py-2.5" style={{ background: bg }}>
+                    <span className="text-xs font-bold tracking-widest uppercase" style={{ color: clr }}>{label}</span>
+                    <span className="text-sm font-black" style={{ color: clr }}>{value}</span>
+                  </div>
+                );
+              })()}
             </div>
 
             <Button
@@ -1610,9 +1618,13 @@ export default function NewInvoicePage() {
               className="w-full mt-5"
               size="lg"
               loading={saving}
-              disabled={saving || (montoPagado !== "" && !canFinish)}
+              disabled={saving || (sumaPagos > 0 && !canFinish)}
             >
-              {isInsuficiente ? "Monto insuficiente" : "Finalizar Factura"}
+              {!canFinish && pendiente < -0.01 && !hayCash
+                ? `Excedente +$${Math.abs(pendiente).toFixed(2)}`
+                : !canFinish && sumaPagos > 0
+                ? `Faltan $${pendiente.toFixed(2)}`
+                : "Finalizar Factura"}
             </Button>
           </div>
         </div>

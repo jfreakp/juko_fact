@@ -115,9 +115,19 @@ export function buildInvoiceXML(data: InvoiceForXML): string {
 
   // ── pagos ─────────────────────────────────────────────────────────────────
   const pagosEl = infoFact.ele("pagos");
-  const pagoEl = pagosEl.ele("pago");
-  pagoEl.ele("formaPago").txt((invoice as { formaPago?: string }).formaPago ?? "01");
-  pagoEl.ele("total").txt(fmt(Number(invoice.importeTotal)));
+  const paymentList = (invoice as { payments?: { formaPago: string; monto: number | { toString(): string } }[] }).payments;
+  if (paymentList && paymentList.length > 0) {
+    for (const p of paymentList) {
+      const pagoEl = pagosEl.ele("pago");
+      pagoEl.ele("formaPago").txt(p.formaPago);
+      pagoEl.ele("total").txt(fmt(Number(p.monto)));
+    }
+  } else {
+    // Fallback: pago único por el total (compatibilidad con registros antiguos)
+    const pagoEl = pagosEl.ele("pago");
+    pagoEl.ele("formaPago").txt("01");
+    pagoEl.ele("total").txt(fmt(Number(invoice.importeTotal)));
+  }
 
   // ── detalles ──────────────────────────────────────────────────────────────
   const detallesEl = root.ele("detalles");

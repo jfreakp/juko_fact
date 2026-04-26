@@ -66,16 +66,21 @@ export const invoiceService = {
       }
     }
 
-    // Validar pago si se proporcionó montoPagado
-    if (dto.montoPagado !== undefined) {
-      const importeTotal = calcImporteTotal(dto.details);
-      const mp = round2(dto.montoPagado);
-      if (mp < importeTotal) {
-        throw new Error(
-          `Monto insuficiente: se requieren $${importeTotal.toFixed(2)}, se pagaron $${mp.toFixed(2)}`
-        );
-      }
-      dto.vuelto = round2(mp - importeTotal);
+    // Validar pagos: deben existir y sumar exactamente el importe total
+    if (!dto.pagos || dto.pagos.length === 0) {
+      throw new Error("Debe registrar al menos una forma de pago");
+    }
+    const formasPago = dto.pagos.map((p) => p.formaPago);
+    const duplicados = formasPago.filter((f, i) => formasPago.indexOf(f) !== i);
+    if (duplicados.length > 0) {
+      throw new Error("No puede haber más de un pago con la misma forma de pago");
+    }
+    const importeTotal = calcImporteTotal(dto.details);
+    const sumaPagos = round2(dto.pagos.reduce((acc, p) => acc + p.monto, 0));
+    if (Math.abs(sumaPagos - importeTotal) > 0.01) {
+      throw new Error(
+        `La suma de los pagos ($${sumaPagos.toFixed(2)}) no coincide con el total de la factura ($${importeTotal.toFixed(2)})`
+      );
     }
 
     // Validar stock disponible antes de crear (fuera de tx para mejor mensaje de error)

@@ -663,9 +663,9 @@ async function main() {
         ambiente:    "PRUEBAS",
         estado,
         fechaEmision,
-        formaPago:   "01",
         ...totals,
         details:     { create: details },
+        payments:    { create: [{ formaPago: "01", monto: totals.importeTotal, orden: 0 }] },
       },
     });
   }

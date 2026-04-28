@@ -3,7 +3,7 @@ import type { Prisma } from "@prisma/client";
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
-function calcVencimiento(
+export function calcVencimiento(
   fechaEmision: Date,
   plazo?: number | null,
   unidadTiempo?: string | null
@@ -12,13 +12,80 @@ function calcVencimiento(
   const n = plazo ?? 30;
   if (unidadTiempo === "meses") {
     fecha.setMonth(fecha.getMonth() + n);
+  } else if (unidadTiempo === "anios") {
+    fecha.setFullYear(fecha.getFullYear() + n);
   } else {
     fecha.setDate(fecha.getDate() + n);
   }
   return fecha;
 }
 
-export { calcVencimiento };
+/**
+ * Genera el plan de cuotas mensuales para un crédito a N meses.
+ * Cuota i vence en fechaEmision + i meses (i = 1..plazo).
+ * El monto se distribuye uniformemente; la última cuota absorbe el centavo de redondeo.
+ */
+function buildCuotas(
+  cxcId: string,
+  fechaEmision: Date,
+  total: number,
+  plazo: number
+): Prisma.CuotaCxCCreateManyInput[] {
+  const montoPorCuota = Math.floor((total / plazo) * 100) / 100;
+  const ultimaMonto = Math.round((total - montoPorCuota * (plazo - 1)) * 100) / 100;
+
+  return Array.from({ length: plazo }, (_, i) => {
+    const fechaVenc = new Date(fechaEmision);
+    fechaVenc.setMonth(fechaVenc.getMonth() + (i + 1));
+    return {
+      cxcId,
+      numeroCuota: i + 1,
+      monto: i === plazo - 1 ? ultimaMonto : montoPorCuota,
+      fechaVencimiento: fechaVenc,
+      estado: "PENDIENTE" as const,
+    };
+  });
+}
+
+/**
+ * Actualiza estados de cuotas tras un abono.
+ * Regla: marca PAGADO las primeras N cuotas cuya suma acumulada ≤ totalCobrado.
+ * Las restantes quedan PENDIENTE o VENCIDO si ya pasó su fecha.
+ */
+async function actualizarCuotas(
+  tx: Prisma.TransactionClient,
+  cxcId: string,
+  totalCobrado: number
+) {
+  const cuotas = await tx.cuotaCxC.findMany({
+    where: { cxcId },
+    orderBy: { numeroCuota: "asc" },
+  });
+  if (cuotas.length === 0) return;
+
+  const now = new Date();
+  let acumulado = 0;
+
+  for (const cuota of cuotas) {
+    acumulado = Math.round((acumulado + Number(cuota.monto)) * 100) / 100;
+
+    let nuevoEstado: "PENDIENTE" | "PAGADO" | "VENCIDO";
+    if (totalCobrado >= acumulado - 0.01) {
+      nuevoEstado = "PAGADO";
+    } else if (cuota.fechaVencimiento < now) {
+      nuevoEstado = "VENCIDO";
+    } else {
+      nuevoEstado = "PENDIENTE";
+    }
+
+    if (nuevoEstado !== cuota.estado) {
+      await tx.cuotaCxC.update({
+        where: { id: cuota.id },
+        data: { estado: nuevoEstado as never },
+      });
+    }
+  }
+}
 
 // ─── Repositorio ─────────────────────────────────────────────────────────────
 
@@ -50,7 +117,7 @@ export const cxcRepository = {
           invoice: {
             select: { secuencial: true, fechaEmision: true, importeTotal: true },
           },
-          abonos: { orderBy: { fecha: "desc" }, take: 1 },
+          cuotas: { orderBy: { numeroCuota: "asc" } },
         },
         orderBy: { fechaVencimiento: "asc" },
         skip,
@@ -78,6 +145,7 @@ export const cxcRepository = {
           },
         },
         abonos: { orderBy: { fecha: "asc" } },
+        cuotas: { orderBy: { numeroCuota: "asc" } },
       },
     });
   },
@@ -100,7 +168,7 @@ export const cxcRepository = {
       data.unidadTiempo
     );
 
-    return tx.cuentaPorCobrar.create({
+    const cxc = await tx.cuentaPorCobrar.create({
       data: {
         companyId: data.companyId,
         clientId: data.clientId,
@@ -111,6 +179,23 @@ export const cxcRepository = {
         fechaVencimiento,
       },
     });
+
+    // Generar plan de cuotas para créditos en meses (plazo >= 1)
+    if (
+      data.unidadTiempo === "meses" &&
+      data.plazo &&
+      data.plazo >= 1
+    ) {
+      const cuotas = buildCuotas(
+        cxc.id,
+        data.fechaEmision,
+        data.totalOriginal,
+        data.plazo
+      );
+      await tx.cuotaCxC.createMany({ data: cuotas });
+    }
+
+    return cxc;
   },
 
   async registrarAbono(
@@ -164,19 +249,27 @@ export const cxcRepository = {
         },
       });
 
-      return tx.cuentaPorCobrar.update({
+      const updated = await tx.cuentaPorCobrar.update({
         where: { id: cxcId },
         data: { saldoPendiente: nuevoSaldo, estado: nuevoEstado as never },
         include: {
           client: true,
           invoice: { select: { id: true, secuencial: true } },
           abonos: { orderBy: { fecha: "asc" } },
+          cuotas: { orderBy: { numeroCuota: "asc" } },
         },
       });
+
+      // Actualizar estados de cuotas según lo cobrado hasta ahora
+      const totalCobrado = Math.round(
+        (Number(cxc.totalOriginal) - nuevoSaldo) * 100
+      ) / 100;
+      await actualizarCuotas(tx, cxcId, totalCobrado);
+
+      return updated;
     });
   },
 
-  // Cancela la CxC asociada a una factura anulada (si existe y no está pagada)
   async cancelarWithTx(tx: Prisma.TransactionClient, invoiceId: string) {
     const cxc = await tx.cuentaPorCobrar.findFirst({ where: { invoiceId } });
     if (!cxc) return;
@@ -199,16 +292,19 @@ export const cxcRepository = {
       prisma.cuentaPorCobrar.groupBy({
         by: ["estado"],
         where: { companyId },
-        _count: { id: true },
+        orderBy: { estado: "asc" },
+        _count: { _all: true },
         _sum: { saldoPendiente: true },
       }),
     ]);
 
     const map: Record<string, { count: number; saldo: number }> = {};
     for (const s of byEstado) {
+      // Prisma v7 groupBy types bleed input shape into result — cast needed
+      const cnt = s._count as { _all?: number } | undefined;
       map[s.estado] = {
-        count: s._count.id,
-        saldo: Number(s._sum.saldoPendiente ?? 0),
+        count: cnt?._all ?? 0,
+        saldo: Number(s._sum?.saldoPendiente ?? 0),
       };
     }
 

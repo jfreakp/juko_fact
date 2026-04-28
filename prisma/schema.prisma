@@ -85,6 +85,12 @@ enum EstadoCxC {
   CANCELADA
 }
 
+enum EstadoCuota {
+  PENDIENTE
+  PAGADO
+  VENCIDO
+}
+
 enum StockMovementType {
   ENTRADA
   SALIDA
@@ -590,12 +596,27 @@ model CuentaPorCobrar {
   updatedAt        DateTime   @updatedAt
 
   abonos           AbonoCxC[]
+  cuotas           CuotaCxC[]
 
   @@index([companyId])
   @@index([clientId])
   @@index([estado])
   @@index([fechaVencimiento])
   @@map("cuentas_por_cobrar")
+}
+
+model CuotaCxC {
+  id               String          @id @default(cuid())
+  cxcId            String
+  cxc              CuentaPorCobrar @relation(fields: [cxcId], references: [id], onDelete: Cascade)
+  numeroCuota      Int
+  monto            Decimal         @db.Decimal(12, 2)
+  fechaVencimiento DateTime
+  estado           EstadoCuota     @default(PENDIENTE)
+  createdAt        DateTime        @default(now())
+
+  @@index([cxcId])
+  @@map("cuotas_cxc")
 }
 
 model AbonoCxC {

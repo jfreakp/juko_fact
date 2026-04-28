@@ -321,7 +321,7 @@ export default function CxCDetailPage({
 
       {/* Modal registrar abono */}
       <Modal
-        isOpen={modalOpen}
+        open={modalOpen}
         onClose={() => setModalOpen(false)}
         title="Registrar Abono"
       >

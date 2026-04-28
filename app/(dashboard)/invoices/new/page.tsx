@@ -1559,7 +1559,7 @@ export default function NewInvoicePage() {
                             type="number"
                             min="1"
                             placeholder="30"
-                            value={pago.plazo ?? ""}
+                            value={pago.plazo ?? "30"}
                             onChange={(e) => updatePago(pago.id, { plazo: e.target.value })}
                             className="w-full px-3 py-1.5 rounded-lg text-sm font-medium outline-none transition-colors"
                             style={{

@@ -2,6 +2,7 @@ import { invoiceRepository } from "./invoice.repository";
 import { companyRepository } from "@/modules/company/company.repository";
 import { clientRepository } from "@/modules/clients/client.repository";
 import { validateStock, deductFromInvoice, revertFromInvoice } from "@/modules/inventory/stock.service";
+import { cxcRepository } from "@/modules/cxc/cxc.repository";
 import { prisma } from "@/lib/prisma";
 import type { CreateInvoiceDTO, CreateInvoiceDetailDTO } from "@/types";
 import { IVA_RATES } from "@/types";
@@ -97,9 +98,31 @@ export const invoiceService = {
       }
     }
 
-    // Sin integración de stock (sin branchId o sin userId): flujo original
+    // Detectar pago a crédito (formaPago=19) para crear CxC
+    const pagoCredito = dto.pagos.find((p) => p.formaPago === "19");
+
+    // Sin integración de stock (sin branchId o sin userId)
     if (!branchId || !userId) {
-      return invoiceRepository.create(companyId, dto.clientId, company.ambiente, dto, branchId);
+      // Sin crédito: flujo original sin transacción
+      if (!pagoCredito) {
+        return invoiceRepository.create(companyId, dto.clientId, company.ambiente, dto, branchId);
+      }
+      // Con crédito: necesitamos transacción para atomicidad
+      return prisma.$transaction(async (tx) => {
+        const invoice = await invoiceRepository.createWithTx(
+          tx, companyId, dto.clientId, company.ambiente, dto, branchId
+        );
+        await cxcRepository.createWithTx(tx, {
+          companyId,
+          clientId: dto.clientId,
+          invoiceId: invoice.id,
+          totalOriginal: pagoCredito.monto,
+          plazo: pagoCredito.plazo ?? null,
+          unidadTiempo: pagoCredito.unidadTiempo ?? null,
+          fechaEmision: invoice.fechaEmision,
+        });
+        return invoice;
+      });
     }
 
     // Con stock: todo en una transacción
@@ -122,6 +145,18 @@ export const invoiceService = {
         });
       }
 
+      if (pagoCredito) {
+        await cxcRepository.createWithTx(tx, {
+          companyId,
+          clientId: dto.clientId,
+          invoiceId: invoice.id,
+          totalOriginal: pagoCredito.monto,
+          plazo: pagoCredito.plazo ?? null,
+          unidadTiempo: pagoCredito.unidadTiempo ?? null,
+          fechaEmision: invoice.fechaEmision,
+        });
+      }
+
       return invoice;
     });
   },
@@ -140,12 +175,16 @@ export const invoiceService = {
       );
     }
 
-    // Sin integración de stock
+    // Sin integración de stock: anular en tx para poder cancelar CxC atómicamente
     if (!invoice.branchId || !userId) {
-      return invoiceRepository.anular(id, motivo);
+      return prisma.$transaction(async (tx) => {
+        const anulada = await invoiceRepository.anularWithTx(tx, id, motivo);
+        await cxcRepository.cancelarWithTx(tx, id);
+        return anulada;
+      });
     }
 
-    // Con stock: revertir movimientos en la misma transacción
+    // Con stock: revertir movimientos y cancelar CxC en la misma transacción
     return prisma.$transaction(async (tx) => {
       const anulada = await invoiceRepository.anularWithTx(tx, id, motivo);
 
@@ -162,6 +201,8 @@ export const invoiceService = {
           tx,
         });
       }
+
+      await cxcRepository.cancelarWithTx(tx, id);
 
       return anulada;
     });

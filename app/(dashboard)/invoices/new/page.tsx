@@ -1177,8 +1177,14 @@ export default function NewInvoicePage() {
   const [lines, setLines] = useState<DetailLine[]>([emptyLine()]);
   const [saving, setSaving] = useState(false);
 
-  type PagoCode = "01" | "17" | "19" | "20";
-  type PagoEntry = { id: string; formaPago: PagoCode; monto: string };
+  type PagoCode = "01" | "16" | "17" | "19";
+  type PagoEntry = {
+    id: string;
+    formaPago: PagoCode;
+    monto: string;
+    plazo?: string;
+    unidadTiempo?: string;
+  };
   const [pagos, setPagos] = useState<PagoEntry[]>([
     { id: crypto.randomUUID(), formaPago: "01", monto: "" },
   ]);
@@ -1278,8 +1284,8 @@ export default function NewInvoicePage() {
   const METODOS: { code: PagoCode; label: string }[] = [
     { code: "01", label: "Efectivo" },
     { code: "17", label: "Transferencia" },
-    { code: "19", label: "Tarjeta" },
-    { code: "20", label: "Otro" },
+    { code: "16", label: "Tarjeta" },
+    { code: "19", label: "Crédito" },
   ];
 
   function addPago() {
@@ -1346,13 +1352,25 @@ export default function NewInvoicePage() {
               .filter((p) => p.monto !== "")
               .map((p) => {
                 const raw = parseFloat(p.monto) || 0;
-                if (p.formaPago === "01") {
-                  const monto = Math.round(Math.min(raw, Math.max(0, restante)) * 100) / 100;
-                  restante = Math.round((restante - monto) * 100) / 100;
-                  return { formaPago: p.formaPago, monto };
+                const base = p.formaPago === "01"
+                  ? (() => {
+                      const monto = Math.round(Math.min(raw, Math.max(0, restante)) * 100) / 100;
+                      restante = Math.round((restante - monto) * 100) / 100;
+                      return { formaPago: p.formaPago, monto };
+                    })()
+                  : (() => {
+                      restante = Math.round((restante - raw) * 100) / 100;
+                      return { formaPago: p.formaPago, monto: raw };
+                    })();
+                // Incluir plazo/unidadTiempo solo para crédito (código 19)
+                if (p.formaPago === "19") {
+                  return {
+                    ...base,
+                    plazo: parseInt(p.plazo || "30") || 30,
+                    unidadTiempo: p.unidadTiempo || "dias",
+                  };
                 }
-                restante = Math.round((restante - raw) * 100) / 100;
-                return { formaPago: p.formaPago, monto: raw };
+                return base;
               })
               .filter((p) => p.monto > 0);
           })(),
@@ -1526,6 +1544,56 @@ export default function NewInvoicePage() {
                         );
                       })}
                     </div>
+
+                    {/* Campos de plazo (solo para Crédito) */}
+                    {pago.formaPago === "19" && (
+                      <div className="grid grid-cols-2 gap-1.5">
+                        <div>
+                          <label
+                            className="text-[9px] font-bold tracking-[0.12em] uppercase block mb-1"
+                            style={{ color: "var(--text-muted)" }}
+                          >
+                            Plazo
+                          </label>
+                          <input
+                            type="number"
+                            min="1"
+                            placeholder="30"
+                            value={pago.plazo ?? "30"}
+                            onChange={(e) => updatePago(pago.id, { plazo: e.target.value })}
+                            className="w-full px-3 py-1.5 rounded-lg text-sm font-medium outline-none transition-colors"
+                            style={{
+                              background: "var(--surface-white)",
+                              border: "2px solid var(--border-subtle)",
+                              color: "var(--text-base)",
+                            }}
+                            onFocus={(e) => (e.currentTarget.style.borderColor = "var(--primary-focus)")}
+                            onBlur={(e) => (e.currentTarget.style.borderColor = "var(--border-subtle)")}
+                          />
+                        </div>
+                        <div>
+                          <label
+                            className="text-[9px] font-bold tracking-[0.12em] uppercase block mb-1"
+                            style={{ color: "var(--text-muted)" }}
+                          >
+                            Unidad
+                          </label>
+                          <select
+                            value={pago.unidadTiempo ?? "dias"}
+                            onChange={(e) => updatePago(pago.id, { unidadTiempo: e.target.value })}
+                            className="w-full px-2 py-1.5 rounded-lg text-sm font-medium"
+                            style={{
+                              background: "var(--surface-white)",
+                              border: "2px solid var(--border-subtle)",
+                              color: "var(--text-base)",
+                            }}
+                          >
+                            <option value="dias">Días</option>
+                            <option value="meses">Meses</option>
+                          </select>
+                        </div>
+                      </div>
+                    )}
 
                     {/* Input monto + quitar */}
                     <div className="flex gap-1.5">

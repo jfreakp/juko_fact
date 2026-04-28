@@ -115,12 +115,27 @@ export function buildInvoiceXML(data: InvoiceForXML): string {
 
   // ── pagos ─────────────────────────────────────────────────────────────────
   const pagosEl = infoFact.ele("pagos");
-  const paymentList = (invoice as { payments?: { formaPago: string; monto: number | { toString(): string } }[] }).payments;
+  const paymentList = (
+    invoice as {
+      payments?: {
+        formaPago: string;
+        monto: number | { toString(): string };
+        plazo?: number | null;
+        unidadTiempo?: string | null;
+      }[];
+    }
+  ).payments;
+
   if (paymentList && paymentList.length > 0) {
     for (const p of paymentList) {
       const pagoEl = pagosEl.ele("pago");
       pagoEl.ele("formaPago").txt(p.formaPago);
       pagoEl.ele("total").txt(fmt(Number(p.monto)));
+      // SRI requiere <plazo> y <unidadTiempo> solo para crédito (código 19)
+      if (p.formaPago === "19" && p.plazo && p.unidadTiempo) {
+        pagoEl.ele("plazo").txt(String(p.plazo));
+        pagoEl.ele("unidadTiempo").txt(p.unidadTiempo);
+      }
     }
   } else {
     // Fallback: pago único por el total (compatibilidad con registros antiguos)

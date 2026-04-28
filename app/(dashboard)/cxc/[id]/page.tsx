@@ -1,12 +1,21 @@
 "use client";
 
 import { use, useEffect, useState, FormEvent } from "react";
-import { useRouter } from "next/navigation";
 import Link from "next/link";
 import Header from "@/components/layout/Header";
 import Button from "@/components/ui/Button";
 import Modal from "@/components/ui/Modal";
 import { useToast } from "@/components/ui/Toast";
+
+// ─── Tipos ────────────────────────────────────────────────────────────────────
+
+interface Cuota {
+  id: string;
+  numeroCuota: number;
+  monto: number;
+  fechaVencimiento: string;
+  estado: "PENDIENTE" | "PAGADO" | "VENCIDO";
+}
 
 interface Abono {
   id: string;
@@ -23,7 +32,6 @@ interface CxCData {
   estado: string;
   fechaVencimiento: string;
   notas: string | null;
-  createdAt: string;
   client: { razonSocial: string; identificacion: string; email: string | null };
   invoice: {
     id: string;
@@ -34,9 +42,12 @@ interface CxCData {
     claveAcceso: string | null;
   };
   abonos: Abono[];
+  cuotas: Cuota[];
 }
 
-const FORMAS_PAGO_ABONO: { value: string; label: string }[] = [
+// ─── Constantes ───────────────────────────────────────────────────────────────
+
+const FORMAS_PAGO_ABONO = [
   { value: "01", label: "Efectivo" },
   { value: "16", label: "Tarjeta de débito" },
   { value: "17", label: "Dinero electrónico" },
@@ -52,6 +63,8 @@ const FORMA_PAGO_LABEL: Record<string, string> = {
   "20": "Otros",
 };
 
+// ─── Helpers visuales ────────────────────────────────────────────────────────
+
 function fmt(val: number) {
   return `$${Number(val).toFixed(2)}`;
 }
@@ -62,20 +75,34 @@ function fmtDate(iso: string) {
   });
 }
 
-function estadoStyle(estado: string, fechaVencimiento?: string): { bg: string; text: string; label: string } {
+function estadoCxCStyle(estado: string, fechaVencimiento?: string) {
   const vencida = fechaVencimiento && new Date(fechaVencimiento) < new Date();
   const efectivo =
     (estado === "PENDIENTE" || estado === "PARCIAL") && vencida ? "VENCIDO" : estado;
 
   const map: Record<string, { bg: string; text: string; label: string }> = {
-    PENDIENTE: { bg: "var(--warning-bg)",       text: "var(--warning-text)",  label: "Pendiente" },
-    PARCIAL:   { bg: "var(--warning-bg)",       text: "var(--warning-text)",  label: "Parcial"   },
-    VENCIDO:   { bg: "var(--error-bg)",         text: "var(--error-text)",    label: "Vencido"   },
-    PAGADO:    { bg: "var(--success-bg)",       text: "var(--success-text)",  label: "Pagado"    },
-    CANCELADA: { bg: "var(--surface-highest)",  text: "var(--text-muted)",    label: "Cancelada" },
+    PENDIENTE: { bg: "var(--warning-bg)",      text: "var(--warning-text)",  label: "Pendiente" },
+    PARCIAL:   { bg: "var(--warning-bg)",      text: "var(--warning-text)",  label: "Parcial"   },
+    VENCIDO:   { bg: "var(--error-bg)",        text: "var(--error-text)",    label: "Vencido"   },
+    PAGADO:    { bg: "var(--success-bg)",      text: "var(--success-text)",  label: "Pagado"    },
+    CANCELADA: { bg: "var(--surface-highest)", text: "var(--text-muted)",    label: "Cancelada" },
   };
   return map[efectivo] ?? map["PENDIENTE"];
 }
+
+function estadoCuotaStyle(estado: string, fechaVencimiento: string) {
+  const vencida = new Date(fechaVencimiento) < new Date();
+  const efectivo = estado === "PENDIENTE" && vencida ? "VENCIDO" : estado;
+
+  const map: Record<string, { bg: string; text: string; label: string }> = {
+    PENDIENTE: { bg: "var(--warning-bg)",      text: "var(--warning-text)",  label: "Pendiente" },
+    VENCIDO:   { bg: "var(--error-bg)",        text: "var(--error-text)",    label: "Vencida"   },
+    PAGADO:    { bg: "var(--success-bg)",      text: "var(--success-text)",  label: "Pagada"    },
+  };
+  return map[efectivo] ?? map["PENDIENTE"];
+}
+
+// ─── Componente principal ─────────────────────────────────────────────────────
 
 export default function CxCDetailPage({
   params,
@@ -83,13 +110,12 @@ export default function CxCDetailPage({
   params: Promise<{ id: string }>;
 }) {
   const { id } = use(params);
-  const router = useRouter();
   const { success, error: toastError } = useToast();
 
-  const [cxc, setCxc]           = useState<CxCData | null>(null);
-  const [loading, setLoading]   = useState(true);
+  const [cxc, setCxc]             = useState<CxCData | null>(null);
+  const [loading, setLoading]     = useState(true);
   const [modalOpen, setModalOpen] = useState(false);
-  const [saving, setSaving]     = useState(false);
+  const [saving, setSaving]       = useState(false);
 
   const [formMonto, setFormMonto]         = useState("");
   const [formFormaPago, setFormFormaPago] = useState("01");
@@ -106,8 +132,8 @@ export default function CxCDetailPage({
 
   useEffect(() => { load(); }, [id]);
 
-  function openModal() {
-    setFormMonto("");
+  function openModal(montoPreset?: number) {
+    setFormMonto(montoPreset ? montoPreset.toFixed(2) : "");
     setFormFormaPago("01");
     setFormNotas("");
     setModalOpen(true);
@@ -116,24 +142,17 @@ export default function CxCDetailPage({
   async function handleAbono(e: FormEvent) {
     e.preventDefault();
     const monto = parseFloat(formMonto);
-    if (!monto || monto <= 0) {
-      toastError("El monto debe ser mayor a 0");
-      return;
-    }
+    if (!monto || monto <= 0) { toastError("El monto debe ser mayor a 0"); return; }
     if (cxc && monto > Number(cxc.saldoPendiente) + 0.001) {
-      toastError(`El monto excede el saldo pendiente (${fmt(Number(cxc.saldoPendiente))})`);
+      toastError(`Excede el saldo pendiente (${fmt(Number(cxc.saldoPendiente))})`);
       return;
     }
     setSaving(true);
     try {
-      const res  = await fetch(`/api/cxc/${id}/abonos`, {
+      const res = await fetch(`/api/cxc/${id}/abonos`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          monto,
-          formaPago: formFormaPago,
-          notas: formNotas || undefined,
-        }),
+        body: JSON.stringify({ monto, formaPago: formFormaPago, notas: formNotas || undefined }),
       });
       const json = await res.json();
       if (!json.success) throw new Error(json.error);
@@ -163,25 +182,33 @@ export default function CxCDetailPage({
     );
   }
 
-  const total        = Number(cxc.totalOriginal);
-  const saldo        = Number(cxc.saldoPendiente);
-  const cobrado      = total - saldo;
-  const pct          = total > 0 ? Math.min(100, (cobrado / total) * 100) : 0;
-  const estadoCfg    = estadoStyle(cxc.estado, cxc.fechaVencimiento);
-  const puedoAbonar  = cxc.estado !== "PAGADO" && cxc.estado !== "CANCELADA";
+  const total       = Number(cxc.totalOriginal);
+  const saldo       = Number(cxc.saldoPendiente);
+  const cobrado     = total - saldo;
+  const pct         = total > 0 ? Math.min(100, (cobrado / total) * 100) : 0;
+  const estadoCfg   = estadoCxCStyle(cxc.estado, cxc.fechaVencimiento);
+  const puedoAbonar = cxc.estado !== "PAGADO" && cxc.estado !== "CANCELADA";
+  const tieneCuotas = cxc.cuotas.length > 0;
+
+  // Cuotas pendientes (para el badge de resumen)
+  const cuotasPendientes = cxc.cuotas.filter(
+    (c) => c.estado !== "PAGADO"
+  ).length;
 
   return (
     <div className="min-h-screen p-8" style={{ background: "var(--surface)" }}>
+      {/* Breadcrumb */}
       <div className="mb-6">
         <Link
           href="/cxc"
           className="text-[10px] font-bold tracking-widest uppercase"
           style={{ color: "var(--text-muted)" }}
         >
-          ← Volver a Cuentas x Cobrar
+          ← Cuentas por Cobrar
         </Link>
       </div>
 
+      {/* Header */}
       <div className="flex items-start justify-between mb-8">
         <div>
           <div className="flex items-center gap-3 mb-1">
@@ -200,17 +227,17 @@ export default function CxCDetailPage({
           </p>
         </div>
         {puedoAbonar && (
-          <Button onClick={openModal}>Registrar Abono</Button>
+          <Button onClick={() => openModal()}>Registrar Abono</Button>
         )}
       </div>
 
-      {/* Info cards */}
+      {/* KPI cards */}
       <div className="grid grid-cols-2 gap-4 mb-6 lg:grid-cols-4">
         {[
-          { label: "Total Factura",      value: fmt(total)  },
-          { label: "Cobrado",            value: fmt(cobrado) },
-          { label: "Saldo Pendiente",    value: fmt(saldo)  },
-          { label: "Vence",              value: fmtDate(cxc.fechaVencimiento) },
+          { label: "Total Factura",   value: fmt(total)   },
+          { label: "Cobrado",         value: fmt(cobrado) },
+          { label: "Saldo Pendiente", value: fmt(saldo)   },
+          { label: "Vence",           value: fmtDate(cxc.fechaVencimiento) },
         ].map((c) => (
           <div
             key={c.label}
@@ -250,16 +277,151 @@ export default function CxCDetailPage({
           />
         </div>
         <div className="flex justify-between mt-1.5">
-          <span className="text-[10px]" style={{ color: "var(--text-muted)" }}>
-            Cobrado: {fmt(cobrado)}
-          </span>
-          <span className="text-[10px]" style={{ color: "var(--text-muted)" }}>
-            Pendiente: {fmt(saldo)}
-          </span>
+          <span className="text-[10px]" style={{ color: "var(--text-muted)" }}>Cobrado: {fmt(cobrado)}</span>
+          <span className="text-[10px]" style={{ color: "var(--text-muted)" }}>Pendiente: {fmt(saldo)}</span>
         </div>
       </div>
 
-      {/* Historial de abonos */}
+      {/* ── Plan de Pago (Cuotas) ────────────────────────────────────────────── */}
+      {tieneCuotas && (
+        <div
+          className="rounded-xl overflow-hidden mb-6"
+          style={{ border: "1px solid var(--surface-highest)" }}
+        >
+          {/* Header */}
+          <div
+            className="px-5 py-3 flex items-center justify-between"
+            style={{ background: "var(--surface-mid)", borderBottom: "1px solid var(--surface-highest)" }}
+          >
+            <div>
+              <p className="text-[9px] font-bold tracking-[0.15em] uppercase" style={{ color: "var(--text-muted)" }}>
+                Plan de Pago — {cxc.cuotas.length} cuotas mensuales
+              </p>
+            </div>
+            {cuotasPendientes > 0 && (
+              <span
+                className="px-2 py-0.5 rounded text-[9px] font-bold tracking-[0.12em] uppercase"
+                style={{ background: "var(--warning-bg)", color: "var(--warning-text)" }}
+              >
+                {cuotasPendientes} pendiente{cuotasPendientes !== 1 ? "s" : ""}
+              </span>
+            )}
+          </div>
+
+          <table className="w-full text-sm">
+            <thead>
+              <tr style={{ background: "var(--surface-mid)" }}>
+                {["Cuota", "Vencimiento", "Monto", "Estado", ""].map((h) => (
+                  <th
+                    key={h}
+                    className="px-4 py-2.5 text-left text-[9px] font-bold tracking-[0.15em] uppercase"
+                    style={{ color: "var(--text-muted)" }}
+                  >
+                    {h}
+                  </th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {cxc.cuotas.map((cuota, i) => {
+                const cfg        = estadoCuotaStyle(cuota.estado, cuota.fechaVencimiento);
+                const esPagada   = cuota.estado === "PAGADO";
+                const puedeAbonar = puedoAbonar && !esPagada;
+
+                return (
+                  <tr
+                    key={cuota.id}
+                    style={{
+                      background: i % 2 === 0 ? "var(--surface-white)" : "var(--surface)",
+                      opacity: esPagada ? 0.7 : 1,
+                    }}
+                  >
+                    {/* N° cuota */}
+                    <td className="px-4 py-3">
+                      <div className="flex items-center gap-2">
+                        <div
+                          className="w-6 h-6 rounded-md flex items-center justify-center text-[10px] font-black flex-shrink-0"
+                          style={{
+                            background: esPagada ? "var(--success-bg)" : "var(--surface-highest)",
+                            color: esPagada ? "var(--success-text)" : "var(--text-muted)",
+                          }}
+                        >
+                          {esPagada ? "✓" : cuota.numeroCuota}
+                        </div>
+                        <span className="text-xs font-semibold" style={{ color: "var(--text-muted)" }}>
+                          Cuota {cuota.numeroCuota}
+                        </span>
+                      </div>
+                    </td>
+
+                    {/* Fecha vencimiento */}
+                    <td className="px-4 py-3 text-xs" style={{ color: "var(--text-muted)" }}>
+                      {fmtDate(cuota.fechaVencimiento)}
+                    </td>
+
+                    {/* Monto */}
+                    <td className="px-4 py-3">
+                      <span className="text-sm font-black" style={{ color: "var(--text-base)" }}>
+                        {fmt(cuota.monto)}
+                      </span>
+                    </td>
+
+                    {/* Estado */}
+                    <td className="px-4 py-3">
+                      <span
+                        className="inline-block px-2 py-0.5 rounded text-[9px] font-bold tracking-[0.12em] uppercase"
+                        style={{ background: cfg.bg, color: cfg.text }}
+                      >
+                        {cfg.label}
+                      </span>
+                    </td>
+
+                    {/* Acción */}
+                    <td className="px-4 py-3">
+                      {puedeAbonar && (
+                        <button
+                          type="button"
+                          onClick={() => openModal(Number(cuota.monto))}
+                          className="text-[10px] font-bold tracking-widest uppercase px-2.5 py-1 rounded-md transition-colors"
+                          style={{
+                            background: "var(--primary)",
+                            color: "var(--on-primary)",
+                          }}
+                          onMouseEnter={(e) =>
+                            ((e.currentTarget as HTMLElement).style.opacity = "0.85")
+                          }
+                          onMouseLeave={(e) =>
+                            ((e.currentTarget as HTMLElement).style.opacity = "1")
+                          }
+                        >
+                          Pagar
+                        </button>
+                      )}
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+
+            {/* Total row */}
+            <tfoot>
+              <tr style={{ background: "var(--surface-mid)", borderTop: "2px solid var(--surface-highest)" }}>
+                <td className="px-4 py-3 text-[9px] font-bold tracking-widest uppercase" style={{ color: "var(--text-muted)" }} colSpan={2}>
+                  Total plan
+                </td>
+                <td className="px-4 py-3">
+                  <span className="text-sm font-black" style={{ color: "var(--primary-focus)" }}>
+                    {fmt(cxc.cuotas.reduce((s, c) => s + Number(c.monto), 0))}
+                  </span>
+                </td>
+                <td colSpan={2} />
+              </tr>
+            </tfoot>
+          </table>
+        </div>
+      )}
+
+      {/* ── Historial de Abonos ──────────────────────────────────────────────── */}
       <div
         className="rounded-xl overflow-hidden"
         style={{ border: "1px solid var(--surface-highest)" }}
@@ -306,7 +468,7 @@ export default function CxCDetailPage({
                   <td className="px-4 py-3 text-xs" style={{ color: "var(--text-base)" }}>
                     {FORMA_PAGO_LABEL[abono.formaPago] ?? abono.formaPago}
                   </td>
-                  <td className="px-4 py-3 text-xs font-bold" style={{ color: "var(--text-base)" }}>
+                  <td className="px-4 py-3 text-xs font-black" style={{ color: "var(--text-base)" }}>
                     {fmt(abono.monto)}
                   </td>
                   <td className="px-4 py-3 text-xs" style={{ color: "var(--text-muted)" }}>
@@ -319,9 +481,9 @@ export default function CxCDetailPage({
         )}
       </div>
 
-      {/* Modal registrar abono */}
+      {/* ── Modal Registrar Abono ─────────────────────────────────────────────── */}
       <Modal
-        isOpen={modalOpen}
+        open={modalOpen}
         onClose={() => setModalOpen(false)}
         title="Registrar Abono"
       >
@@ -349,7 +511,14 @@ export default function CxCDetailPage({
                 color: "var(--text-base)",
                 outline: "none",
               }}
+              onFocus={(e) => (e.currentTarget.style.borderColor = "var(--primary-focus)")}
+              onBlur={(e) => (e.currentTarget.style.borderColor = "var(--border-subtle)")}
             />
+            {saldo > 0 && (
+              <p className="mt-1 text-[10px]" style={{ color: "var(--text-muted)" }}>
+                Saldo pendiente: <strong>{fmt(saldo)}</strong>
+              </p>
+            )}
           </div>
 
           <div>
@@ -393,6 +562,8 @@ export default function CxCDetailPage({
                 color: "var(--text-base)",
                 outline: "none",
               }}
+              onFocus={(e) => (e.currentTarget.style.borderColor = "var(--primary-focus)")}
+              onBlur={(e) => (e.currentTarget.style.borderColor = "var(--border-subtle)")}
             />
           </div>
 
